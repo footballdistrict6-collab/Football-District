@@ -59,18 +59,20 @@ export default function ProductDetailPage() {
     ? product.image_urls 
     : ['https://images.unsplash.com/photo-1583318433420-532155e9d9e4?q=80&w=500&auto=format&fit=crop'];
 
-  const handleAddToCart = () => {
-    addItem({
-      id: `${product.id}-${selectedSize}`,
-      title: `${product.title} (Size: ${selectedSize})`,
-      price: product.price?.toString() || '0',
-      image: galleryImages[0],
-      quantity: 1
-    });
-
-    setAdded(true);
-    setTimeout(() => setAdded(false), 2000);
-  };
+    const handleAddToCart = () => {
+        addItem({
+          id: `${product.id}-${selectedSize}`,
+          title: `${product.title} (Size: ${selectedSize})`,
+          price: product.price?.toString() || '0',
+          image: galleryImages[0],
+          quantity: 1,
+          // تمرير النقاط الفعلية للمنتج إلى السلة عند إضافته من صفحة التفاصيل
+          loyalty_points_earned: Number(product.loyalty_points_earned) || 20
+        });
+    
+        setAdded(true);
+        setTimeout(() => setAdded(false), 2000);
+      };
 
   const sizes = ['S', 'M', 'L', 'XL', '2XL'];
 

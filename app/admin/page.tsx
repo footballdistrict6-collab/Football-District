@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Package, ShoppingBag, Plus, RefreshCw, CheckCircle2, Clock, Upload, FileSpreadsheet, Loader2, Trash2, Edit3, X } from 'lucide-react';
+import { Package, ShoppingBag, Plus, RefreshCw, CheckCircle2, Clock, Upload, FileSpreadsheet, Loader2, Trash2, Edit3, X, Image as ImageIcon } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 export default function AdminDashboard() {
@@ -20,16 +20,16 @@ export default function AdminDashboard() {
     title: '',
     price: '',
     category: '',
-    imageUrl: ''
+    imageUrls: [''] // مصفوفة لعدة صور
   });
 
   // حقول إضافة منتج جديد يدوياً
   const [newProduct, setNewProduct] = useState({
     title: '',
     price: '',
-    category: 'Jerseys',
+    category: 'Home Jerseys',
     season: '2026-2027',
-    imageUrl: ''
+    imageUrls: [''] // مصفوفة لعدة صور
   });
 
   const fetchOrders = async () => {
@@ -59,15 +59,17 @@ export default function AdminDashboard() {
     fetchProducts();
   }, []);
 
+  // إضافة منتج جديد بعدة صور
   const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault();
+    const cleanUrls = newProduct.imageUrls.filter(url => url.trim() !== '');
     const { error } = await supabase.from('products').insert([
       {
         title: newProduct.title,
         price: parseFloat(newProduct.price),
         category: newProduct.category,
         season: newProduct.season,
-        image_urls: [newProduct.imageUrl],
+        image_urls: cleanUrls.length > 0 ? cleanUrls : ['https://images.unsplash.com/photo-1583318433420-532155e9d9e4?q=80&w=500&auto=format&fit=crop'],
         is_retro: false
       }
     ]);
@@ -76,7 +78,7 @@ export default function AdminDashboard() {
       alert("حدث خطأ أثناء إضافة المنتج: " + error.message);
     } else {
       alert("تمت إضافة المنتج بنجاح إلى الكتالوج! ✅");
-      setNewProduct({ title: '', price: '', category: 'Jerseys', season: '2026-2027', imageUrl: '' });
+      setNewProduct({ title: '', price: '', category: 'Home Jerseys', season: '2026-2027', imageUrls: [''] });
       fetchProducts();
     }
   };
@@ -92,44 +94,77 @@ export default function AdminDashboard() {
     }
   };
 
-  // فتح نافذة التعديل وتعبئة البيانات الحالية للمنتج
+  // فتح نافذة التعديل مع تحميل كل الصور الحالية
   const openEditModal = (product: any) => {
     setEditingProduct(product);
-    const imgUrl = Array.isArray(product.image_urls) && product.image_urls.length > 0 
-      ? product.image_urls[0] 
-      : '';
+    const urls = Array.isArray(product.image_urls) && product.image_urls.length > 0 
+      ? product.image_urls 
+      : [''];
     setEditForm({
       title: product.title || '',
       price: product.price?.toString() || '',
-      category: product.category || 'Jerseys',
-      imageUrl: imgUrl
+      category: product.category || 'Home Jerseys',
+      imageUrls: urls
     });
   };
 
-  // حفظ التعديلات في قاعدة البيانات
+  // حفظ التعديلات بعدة صور في قاعدة البيانات
   const handleUpdateProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingProduct) return;
 
+    const cleanUrls = editForm.imageUrls.filter(url => url.trim() !== '');
     const { error } = await supabase
       .from('products')
       .update({
         title: editForm.title,
         price: parseFloat(editForm.price),
         category: editForm.category,
-        image_urls: [editForm.imageUrl]
+        image_urls: cleanUrls.length > 0 ? cleanUrls : ['https://images.unsplash.com/photo-1583318433420-532155e9d9e4?q=80&w=500&auto=format&fit=crop']
       })
       .eq('id', editingProduct.id);
 
     if (error) {
       alert("حدث خطأ أثناء التعديل: " + error.message);
     } else {
-      alert("✅ تم تعديل المنتج بنجاح!");
+      alert("✅ تم تعديل المنتج وحفظ جميع الصور بنجاح!");
       setEditingProduct(null);
       fetchProducts();
     }
   };
 
+  // أزرار التحكم في خانات الصور (إضافة خانة جديدة أو حذف خانة)
+  const handleAddImageUrlField = (isEdit: boolean) => {
+    if (isEdit) {
+      setEditForm({ ...editForm, imageUrls: [...editForm.imageUrls, ''] });
+    } else {
+      setNewProduct({ ...newProduct, imageUrls: [...newProduct.imageUrls, ''] });
+    }
+  };
+
+  const handleRemoveImageUrlField = (index: number, isEdit: boolean) => {
+    if (isEdit) {
+      const updated = editForm.imageUrls.filter((_, i) => i !== index);
+      setEditForm({ ...editForm, imageUrls: updated.length ? updated : [''] });
+    } else {
+      const updated = newProduct.imageUrls.filter((_, i) => i !== index);
+      setNewProduct({ ...newProduct, imageUrls: updated.length ? updated : [''] });
+    }
+  };
+
+  const handleImageUrlChange = (index: number, value: string, isEdit: boolean) => {
+    if (isEdit) {
+      const updated = [...editForm.imageUrls];
+      updated[index] = value;
+      setEditForm({ ...editForm, imageUrls: updated });
+    } else {
+      const updated = [...newProduct.imageUrls];
+      updated[index] = value;
+      setNewProduct({ ...newProduct, imageUrls: updated });
+    }
+  };
+
+  // استيراد الإكسل
   const handleExcelUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -151,7 +186,7 @@ export default function AdminDashboard() {
         const formattedProducts = jsonData.map((row) => ({
           title: row['Name'] || row['title'] || 'Unnamed Product',
           price: parseFloat(row['Regular Price'] || row['price'] || 0),
-          category: row['Category'] || 'Jerseys',
+          category: row['Category'] || 'Home Jerseys',
           season: '2026-2027',
           description: row['Description'] || '',
           image_urls: row['Image URL'] ? [row['Image URL']] : ['https://images.unsplash.com/photo-1583318433420-532155e9d9e4?q=80&w=500&auto=format&fit=crop'],
@@ -316,12 +351,18 @@ export default function AdminDashboard() {
                   const imgUrl = Array.isArray(product.image_urls) && product.image_urls.length > 0 
                     ? product.image_urls[0] 
                     : 'https://images.unsplash.com/photo-1583318433420-532155e9d9e4?q=80&w=500&auto=format&fit=crop';
+                  const totalImages = Array.isArray(product.image_urls) ? product.image_urls.length : 1;
 
                   return (
                     <div key={product.id} className="bg-[#121212] p-4 rounded-xl border border-[#1f1f1f] flex items-center justify-between gap-4 hover:border-[#333] transition">
                       <div className="flex items-center gap-4 min-w-0">
-                        <div className="w-16 h-16 bg-[#1a1a1a] rounded-lg overflow-hidden shrink-0 flex items-center justify-center">
+                        <div className="w-16 h-16 bg-[#1a1a1a] rounded-lg overflow-hidden shrink-0 flex items-center justify-center relative">
                           <img src={imgUrl} alt={product.title} className="w-full h-full object-cover" />
+                          {totalImages > 1 && (
+                            <span className="absolute bottom-1 right-1 bg-black/80 text-[10px] text-white px-1.5 py-0.5 rounded font-bold">
+                              +{totalImages - 1}
+                            </span>
+                          )}
                         </div>
                         <div className="min-w-0">
                           <h4 className="font-bold text-sm truncate" title={product.title}>{product.title}</h4>
@@ -330,12 +371,11 @@ export default function AdminDashboard() {
                         </div>
                       </div>
 
-                      {/* أزرار التحكم: تعديل (Edit) وحذف (Delete) */}
                       <div className="flex items-center gap-1 shrink-0">
                         <button 
                           onClick={() => openEditModal(product)}
                           className="text-gray-400 hover:text-[#00AEEF] transition p-2 bg-[#1a1a1a] rounded-lg border border-[#333]"
-                          title="Edit Product"
+                          title="Edit Product Details & Images"
                         >
                           <Edit3 className="w-4 h-4" />
                         </button>
@@ -355,7 +395,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* القسم الثالث: إضافة منتج يدوياً */}
+        {/* القسم الثالث: إضافة منتج يدوياً بعدة صور */}
         {activeTab === 'add_product' && (
           <div className="max-w-2xl mx-auto bg-[#121212] p-8 rounded-xl border border-[#1f1f1f]">
             <h2 className="text-2xl font-bold mb-6 border-b border-[#333] pb-4">Add Single Product</h2>
@@ -397,13 +437,39 @@ export default function AdminDashboard() {
               </div>
 
               <div>
-                <label className="block text-sm text-gray-400 mb-2">Image URL</label>
-                <input 
-                  required type="url" value={newProduct.imageUrl}
-                  onChange={(e) => setNewProduct({...newProduct, imageUrl: e.target.value})}
-                  placeholder="https://..." 
-                  className="w-full bg-[#1a1a1a] border border-[#333] rounded p-3 text-white focus:outline-none focus:border-[#00AEEF]"
-                />
+                <div className="flex justify-between items-center mb-2">
+                  <label className="block text-sm text-gray-400">Product Images (URLs)</label>
+                  <button 
+                    type="button"
+                    onClick={() => handleAddImageUrlField(false)}
+                    className="text-xs text-[#00AEEF] hover:underline flex items-center gap-1 font-bold"
+                  >
+                    + Add Another Image URL
+                  </button>
+                </div>
+                <div className="space-y-3">
+                  {newProduct.imageUrls.map((url, i) => (
+                    <div key={i} className="flex gap-2">
+                      <input 
+                        type="url" 
+                        value={url}
+                        onChange={(e) => handleImageUrlChange(i, e.target.value, false)}
+                        className="flex-1 bg-[#1a1a1a] border border-[#333] rounded p-3 text-white focus:outline-none focus:border-[#00AEEF]"
+                        placeholder={`Image #${i + 1} URL (https://...)`} 
+                        required={i === 0}
+                      />
+                      {newProduct.imageUrls.length > 1 && (
+                        <button 
+                          type="button"
+                          onClick={() => handleRemoveImageUrlField(i, false)}
+                          className="bg-[#1f1f1f] hover:bg-red-900/30 text-gray-400 hover:text-red-500 p-3 rounded border border-[#333]"
+                        >
+                          <Trash2 className="w-5 h-5" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
 
               <button type="submit" className="w-full bg-[#00AEEF] hover:bg-blue-500 text-white font-bold py-4 rounded transition shadow-[0_0_15px_rgba(0,174,239,0.3)] mt-4">
@@ -456,10 +522,10 @@ export default function AdminDashboard() {
 
       </div>
 
-      {/* نافذة التعديل المنبثقة (Edit Modal) */}
+      {/* نافذة التعديل المنبثقة تدعم إضافة/حذف صور متعددة (Edit Modal) */}
       {editingProduct && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-          <div className="bg-[#121212] border border-[#333] rounded-2xl p-6 md:p-8 max-w-lg w-full relative shadow-2xl">
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div className="bg-[#121212] border border-[#333] rounded-2xl p-6 md:p-8 max-w-lg w-full relative shadow-2xl my-8">
             <button 
               onClick={() => setEditingProduct(null)}
               className="absolute top-4 right-4 text-gray-400 hover:text-white bg-[#1a1a1a] p-2 rounded-lg"
@@ -468,7 +534,7 @@ export default function AdminDashboard() {
             </button>
 
             <h3 className="text-xl font-bold mb-6 border-b border-[#333] pb-4 flex items-center gap-2">
-              <Edit3 className="text-[#00AEEF] w-5 h-5" /> Edit Product Details
+              <Edit3 className="text-[#00AEEF] w-5 h-5" /> Edit Product & Gallery
             </h3>
 
             <form onSubmit={handleUpdateProduct} className="space-y-4">
@@ -511,16 +577,42 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
+              {/* قسم إدارة الصور المتعددة داخل النافذة المنبثقة */}
               <div>
-                <label className="block text-sm text-gray-400 mb-1">Image URL</label>
-                <input 
-                  type="url" 
-                  value={editForm.imageUrl}
-                  onChange={(e) => setEditForm({...editForm, imageUrl: e.target.value})}
-                  className="w-full bg-[#1a1a1a] border border-[#333] rounded p-3 text-white focus:outline-none focus:border-[#00AEEF]"
-                  placeholder="https://..." 
-                  required
-                />
+                <div className="flex justify-between items-center mb-2">
+                  <label className="block text-sm text-gray-400">Product Image URLs (Gallery)</label>
+                  <button 
+                    type="button"
+                    onClick={() => handleAddImageUrlField(true)}
+                    className="text-xs text-[#00AEEF] hover:underline flex items-center gap-1 font-bold"
+                  >
+                    + Add Another Image
+                  </button>
+                </div>
+                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                  {editForm.imageUrls.map((url, i) => (
+                    <div key={i} className="flex gap-2">
+                      <input 
+                        type="url" 
+                        value={url}
+                        onChange={(e) => handleImageUrlChange(i, e.target.value, true)}
+                        className="flex-1 bg-[#1a1a1a] border border-[#333] rounded p-2.5 text-sm text-white focus:outline-none focus:border-[#00AEEF]"
+                        placeholder={`Image #${i + 1} URL (https://...)`} 
+                        required={i === 0}
+                      />
+                      {editForm.imageUrls.length > 1 && (
+                        <button 
+                          type="button"
+                          onClick={() => handleRemoveImageUrlField(i, true)}
+                          className="bg-[#1f1f1f] hover:bg-red-900/30 text-gray-400 hover:text-red-500 p-2 rounded border border-[#333]"
+                          title="Remove Image"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </div>
 
               <div className="flex gap-3 pt-4">

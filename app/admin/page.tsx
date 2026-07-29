@@ -2,11 +2,15 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Package, ShoppingBag, Plus, RefreshCw, CheckCircle2, Clock, Upload, FileSpreadsheet, Loader2, Trash2, Edit3, X, Image as ImageIcon } from 'lucide-react';
+import { Package, ShoppingBag, Plus, RefreshCw, CheckCircle2, Clock, Upload, FileSpreadsheet, Loader2, Trash2, Edit3, X, Lock, KeyRound, Award, DollarSign } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 export default function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState<'orders' | 'products' | 'add_product' | 'import_excel'>('orders');
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [passcode, setPasscode] = useState('');
+  const [authError, setAuthError] = useState(false);
+
+  const [activeTab, setActiveTab] = useState<'orders' | 'products' | 'add_product' | 'import_excel' | 'loyalty_settings'>('orders');
   const [orders, setOrders] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -14,23 +18,48 @@ export default function AdminDashboard() {
   const [importing, setImporting] = useState(false);
   const [importStatus, setImportStatus] = useState<string | null>(null);
 
-  // حالة التعديل (Modal Edit State)
+  // إعدادات الولاء العامة (قيمة النقطة بالدولار)
+  const [pointValueUsd, setPointValueUsd] = useState<number>(0.05);
+  const [savingLoyalty, setSavingLoyalty] = useState(false);
+
+  // حقول التعديل
   const [editingProduct, setEditingProduct] = useState<any | null>(null);
   const [editForm, setEditForm] = useState({
     title: '',
     price: '',
     category: '',
-    imageUrls: [''] // مصفوفة لعدة صور
+    loyaltyPoints: '20',
+    imageUrls: ['']
   });
 
-  // حقول إضافة منتج جديد يدوياً
+  // حقول إضافة منتج جديد
   const [newProduct, setNewProduct] = useState({
     title: '',
     price: '',
     category: 'Home Jerseys',
     season: '2026-2027',
-    imageUrls: [''] // مصفوفة لعدة صور
+    loyaltyPoints: '20',
+    imageUrls: ['']
   });
+
+  useEffect(() => {
+    const sessionAuth = sessionStorage.getItem('fd_admin_auth');
+    if (sessionAuth === 'true') {
+      setIsAuthenticated(true);
+    }
+  }, []);
+
+  const handlePasscodeSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (passcode === '2026') {
+      setIsAuthenticated(true);
+      sessionStorage.setItem('fd_admin_auth', 'true');
+      setAuthError(false);
+    } else {
+      setAuthError(true);
+      setPasscode('');
+    }
+  };
 
   const fetchOrders = async () => {
     setLoading(true);
@@ -38,7 +67,6 @@ export default function AdminDashboard() {
       .from('orders')
       .select('*')
       .order('created_at', { ascending: false });
-    
     if (data) setOrders(data);
     setLoading(false);
   };
@@ -49,17 +77,48 @@ export default function AdminDashboard() {
       .from('products')
       .select('*')
       .order('id', { ascending: false });
-    
     if (data) setProducts(data);
     setLoadingProducts(false);
   };
 
-  useEffect(() => {
-    fetchOrders();
-    fetchProducts();
-  }, []);
+  // جلب إعدادات برنامج الولاء العامة
+  const fetchLoyaltySettings = async () => {
+    const { data } = await supabase
+      .from('store_settings')
+      .select('loyalty_point_value_usd')
+      .eq('id', 1)
+      .single();
+    if (data && data.loyalty_point_value_usd) {
+      setPointValueUsd(data.loyalty_point_value_usd);
+    }
+  };
 
-  // إضافة منتج جديد بعدة صور
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchOrders();
+      fetchProducts();
+      fetchLoyaltySettings();
+    }
+  }, [isAuthenticated]);
+
+  // حفظ تعديل سعر صرف النقطة
+  const handleSaveLoyaltySettings = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSavingLoyalty(true);
+    const { error } = await supabase
+      .from('store_settings')
+      .update({ loyalty_point_value_usd: pointValueUsd })
+      .eq('id', 1);
+
+    setSavingLoyalty(false);
+    if (error) {
+      alert("حدث خطأ أثناء حفظ الإعدادات: " + error.message);
+    } else {
+      alert("✅ تم تحديث قيمة صرف النقاط بنجاح!");
+    }
+  };
+
+  // إضافة منتج جديد مع النقاط المحددة
   const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanUrls = newProduct.imageUrls.filter(url => url.trim() !== '');
@@ -69,6 +128,7 @@ export default function AdminDashboard() {
         price: parseFloat(newProduct.price),
         category: newProduct.category,
         season: newProduct.season,
+        loyalty_points_earned: parseInt(newProduct.loyaltyPoints) || 20,
         image_urls: cleanUrls.length > 0 ? cleanUrls : ['https://images.unsplash.com/photo-1583318433420-532155e9d9e4?q=80&w=500&auto=format&fit=crop'],
         is_retro: false
       }
@@ -78,14 +138,13 @@ export default function AdminDashboard() {
       alert("حدث خطأ أثناء إضافة المنتج: " + error.message);
     } else {
       alert("تمت إضافة المنتج بنجاح إلى الكتالوج! ✅");
-      setNewProduct({ title: '', price: '', category: 'Home Jerseys', season: '2026-2027', imageUrls: [''] });
+      setNewProduct({ title: '', price: '', category: 'Home Jerseys', season: '2026-2027', loyaltyPoints: '20', imageUrls: [''] });
       fetchProducts();
     }
   };
 
   const handleDeleteProduct = async (id: string | number) => {
     if (!confirm("هل أنت متأكد من حذف هذا المنتج نهائياً؟")) return;
-
     const { error } = await supabase.from('products').delete().eq('id', id);
     if (error) {
       alert("حدث خطأ أثناء الحذف: " + error.message);
@@ -94,7 +153,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // فتح نافذة التعديل مع تحميل كل الصور الحالية
   const openEditModal = (product: any) => {
     setEditingProduct(product);
     const urls = Array.isArray(product.image_urls) && product.image_urls.length > 0 
@@ -104,11 +162,11 @@ export default function AdminDashboard() {
       title: product.title || '',
       price: product.price?.toString() || '',
       category: product.category || 'Home Jerseys',
+      loyaltyPoints: product.loyalty_points_earned?.toString() || '20',
       imageUrls: urls
     });
   };
 
-  // حفظ التعديلات بعدة صور في قاعدة البيانات
   const handleUpdateProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingProduct) return;
@@ -120,6 +178,7 @@ export default function AdminDashboard() {
         title: editForm.title,
         price: parseFloat(editForm.price),
         category: editForm.category,
+        loyalty_points_earned: parseInt(editForm.loyaltyPoints) || 20,
         image_urls: cleanUrls.length > 0 ? cleanUrls : ['https://images.unsplash.com/photo-1583318433420-532155e9d9e4?q=80&w=500&auto=format&fit=crop']
       })
       .eq('id', editingProduct.id);
@@ -127,13 +186,12 @@ export default function AdminDashboard() {
     if (error) {
       alert("حدث خطأ أثناء التعديل: " + error.message);
     } else {
-      alert("✅ تم تعديل المنتج وحفظ جميع الصور بنجاح!");
+      alert("✅ تم تعديل المنتج والنقاط الممنوحة بنجاح!");
       setEditingProduct(null);
       fetchProducts();
     }
   };
 
-  // أزرار التحكم في خانات الصور (إضافة خانة جديدة أو حذف خانة)
   const handleAddImageUrlField = (isEdit: boolean) => {
     if (isEdit) {
       setEditForm({ ...editForm, imageUrls: [...editForm.imageUrls, ''] });
@@ -164,7 +222,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // استيراد الإكسل
   const handleExcelUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -189,6 +246,7 @@ export default function AdminDashboard() {
           category: row['Category'] || 'Home Jerseys',
           season: '2026-2027',
           description: row['Description'] || '',
+          loyalty_points_earned: parseInt(row['Points'] || row['loyalty_points'] || 20),
           image_urls: row['Image URL'] ? [row['Image URL']] : ['https://images.unsplash.com/photo-1583318433420-532155e9d9e4?q=80&w=500&auto=format&fit=crop'],
           is_retro: false
         }));
@@ -215,6 +273,44 @@ export default function AdminDashboard() {
     fetchOrders();
   };
 
+  if (!isAuthenticated) {
+    return (
+      <div className="bg-[#0a0a0a] min-h-screen flex items-center justify-center p-6 text-white">
+        <div className="bg-[#121212] border border-[#1f1f1f] rounded-2xl p-8 max-w-md w-full text-center shadow-2xl">
+          <div className="w-16 h-16 bg-[#1a1a1a] rounded-full flex items-center justify-center mx-auto mb-6 border border-[#333]">
+            <Lock className="w-8 h-8 text-[#00AEEF]" />
+          </div>
+          <h2 className="text-2xl font-extrabold uppercase mb-2">Admin Portal</h2>
+          <p className="text-sm text-gray-400 mb-8">Enter your security PIN code to access the Football District dashboard.</p>
+
+          <form onSubmit={handlePasscodeSubmit} className="space-y-4">
+            <div>
+              <input 
+                type="password"
+                autoFocus
+                value={passcode}
+                onChange={(e) => setPasscode(e.target.value)}
+                placeholder="Enter PIN (2026)" 
+                className="w-full bg-[#1a1a1a] border border-[#333] rounded-xl p-4 text-center text-xl font-bold tracking-widest text-white focus:outline-none focus:border-[#00AEEF] transition"
+              />
+            </div>
+
+            {authError && (
+              <p className="text-xs text-red-500 font-bold">Incorrect PIN code. Access Denied.</p>
+            )}
+
+            <button
+              type="submit"
+              className="w-full bg-[#00AEEF] hover:bg-blue-500 text-white font-bold py-4 rounded-xl transition shadow-[0_0_15px_rgba(0,174,239,0.3)] flex items-center justify-center gap-2"
+            >
+              <KeyRound className="w-5 h-5" /> Unlock Dashboard
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-[#0a0a0a] min-h-screen py-12 text-white relative">
       <div className="container mx-auto px-6 max-w-6xl">
@@ -222,41 +318,59 @@ export default function AdminDashboard() {
         {/* الترويسة وأزرار التبديل */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-10 border-b border-[#1f1f1f] pb-6 gap-4">
           <div>
-            <h1 className="text-3xl font-bold uppercase tracking-wide">
-              Admin <span className="text-[#00AEEF]">Dashboard</span>
-            </h1>
+            <div className="flex items-center gap-3">
+              <h1 className="text-3xl font-bold uppercase tracking-wide">
+                Admin <span className="text-[#00AEEF]">Dashboard</span>
+              </h1>
+              <button 
+                onClick={() => {
+                  sessionStorage.removeItem('fd_admin_auth');
+                  setIsAuthenticated(false);
+                }} 
+                className="text-xs bg-[#1f1f1f] hover:bg-red-900/40 text-gray-400 hover:text-red-400 px-3 py-1.5 rounded-full border border-[#333] transition"
+                title="Lock & Exit Dashboard"
+              >
+                Lock Session
+              </button>
+            </div>
             <p className="text-gray-400 text-sm mt-1">Football District Control Center</p>
           </div>
 
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap gap-2">
             <button 
               onClick={() => setActiveTab('orders')}
-              className={`px-5 py-3 rounded-lg font-bold flex items-center gap-2 transition ${activeTab === 'orders' ? 'bg-[#00AEEF] text-white' : 'bg-[#121212] text-gray-400 hover:text-white'}`}
+              className={`px-4 py-2.5 rounded-lg font-bold flex items-center gap-2 transition text-sm ${activeTab === 'orders' ? 'bg-[#00AEEF] text-white' : 'bg-[#121212] text-gray-400 hover:text-white'}`}
             >
-              <ShoppingBag className="w-5 h-5" /> Orders ({orders.length})
+              <ShoppingBag className="w-4 h-4" /> Orders ({orders.length})
             </button>
             <button 
               onClick={() => setActiveTab('products')}
-              className={`px-5 py-3 rounded-lg font-bold flex items-center gap-2 transition ${activeTab === 'products' ? 'bg-[#00AEEF] text-white' : 'bg-[#121212] text-gray-400 hover:text-white'}`}
+              className={`px-4 py-2.5 rounded-lg font-bold flex items-center gap-2 transition text-sm ${activeTab === 'products' ? 'bg-[#00AEEF] text-white' : 'bg-[#121212] text-gray-400 hover:text-white'}`}
             >
-              <Package className="w-5 h-5" /> Products ({products.length})
+              <Package className="w-4 h-4" /> Products ({products.length})
             </button>
             <button 
               onClick={() => setActiveTab('add_product')}
-              className={`px-5 py-3 rounded-lg font-bold flex items-center gap-2 transition ${activeTab === 'add_product' ? 'bg-[#00AEEF] text-white' : 'bg-[#121212] text-gray-400 hover:text-white'}`}
+              className={`px-4 py-2.5 rounded-lg font-bold flex items-center gap-2 transition text-sm ${activeTab === 'add_product' ? 'bg-[#00AEEF] text-white' : 'bg-[#121212] text-gray-400 hover:text-white'}`}
             >
-              <Plus className="w-5 h-5" /> Add Manual
+              <Plus className="w-4 h-4" /> Add Manual
+            </button>
+            <button 
+              onClick={() => setActiveTab('loyalty_settings')}
+              className={`px-4 py-2.5 rounded-lg font-bold flex items-center gap-2 transition text-sm ${activeTab === 'loyalty_settings' ? 'bg-amber-600 text-white' : 'bg-[#121212] text-gray-400 hover:text-white'}`}
+            >
+              <Award className="w-4 h-4" /> Loyalty Program
             </button>
             <button 
               onClick={() => setActiveTab('import_excel')}
-              className={`px-5 py-3 rounded-lg font-bold flex items-center gap-2 transition ${activeTab === 'import_excel' ? 'bg-green-600 text-white' : 'bg-[#121212] text-gray-400 hover:text-white'}`}
+              className={`px-4 py-2.5 rounded-lg font-bold flex items-center gap-2 transition text-sm ${activeTab === 'import_excel' ? 'bg-green-600 text-white' : 'bg-[#121212] text-gray-400 hover:text-white'}`}
             >
-              <FileSpreadsheet className="w-5 h-5" /> Import Excel
+              <FileSpreadsheet className="w-4 h-4" /> Import Excel
             </button>
           </div>
         </div>
 
-        {/* القسم الأول: طلبات الزبائن */}
+        {/* 1. الطلبات */}
         {activeTab === 'orders' && (
           <div>
             <div className="flex justify-between items-center mb-6">
@@ -329,7 +443,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* القسم الثاني: عرض المنتجات مع زري التعديل والحذف */}
+        {/* 2. عرض المنتجات مع إظهار النقاط الممنوحة */}
         {activeTab === 'products' && (
           <div>
             <div className="flex justify-between items-center mb-6">
@@ -366,8 +480,13 @@ export default function AdminDashboard() {
                         </div>
                         <div className="min-w-0">
                           <h4 className="font-bold text-sm truncate" title={product.title}>{product.title}</h4>
-                          <p className="text-[#00AEEF] font-semibold text-sm mt-1">${product.price}</p>
-                          <span className="text-[10px] bg-[#1a1a1a] text-gray-400 px-2 py-0.5 rounded uppercase">{product.category}</span>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-[#00AEEF] font-semibold text-sm">${product.price}</span>
+                            <span className="text-[10px] bg-amber-900/40 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded font-bold flex items-center gap-1">
+                              <Award className="w-3 h-3" /> +{product.loyalty_points_earned || 20} PTS
+                            </span>
+                          </div>
+                          <span className="text-[10px] bg-[#1a1a1a] text-gray-400 px-2 py-0.5 rounded uppercase mt-1 inline-block">{product.category}</span>
                         </div>
                       </div>
 
@@ -375,7 +494,7 @@ export default function AdminDashboard() {
                         <button 
                           onClick={() => openEditModal(product)}
                           className="text-gray-400 hover:text-[#00AEEF] transition p-2 bg-[#1a1a1a] rounded-lg border border-[#333]"
-                          title="Edit Product Details & Images"
+                          title="Edit Product & Loyalty Points"
                         >
                           <Edit3 className="w-4 h-4" />
                         </button>
@@ -395,7 +514,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* القسم الثالث: إضافة منتج يدوياً بعدة صور */}
+        {/* 3. إضافة منتج جديد مع تحديد النقاط */}
         {activeTab === 'add_product' && (
           <div className="max-w-2xl mx-auto bg-[#121212] p-8 rounded-xl border border-[#1f1f1f]">
             <h2 className="text-2xl font-bold mb-6 border-b border-[#333] pb-4">Add Single Product</h2>
@@ -410,7 +529,7 @@ export default function AdminDashboard() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-4">
                 <div>
                   <label className="block text-sm text-gray-400 mb-2">Price ($ USD)</label>
                   <input 
@@ -433,6 +552,17 @@ export default function AdminDashboard() {
                     <option value="Retro Jerseys">Retro Jerseys</option>
                     <option value="Equipment">Equipment</option>
                   </select>
+                </div>
+                <div>
+                  <label className="block text-sm text-amber-400 font-bold mb-2 flex items-center gap-1">
+                    <Award className="w-4 h-4" /> Points Earned
+                  </label>
+                  <input 
+                    required type="number" value={newProduct.loyaltyPoints}
+                    onChange={(e) => setNewProduct({...newProduct, loyaltyPoints: e.target.value})}
+                    placeholder="20" 
+                    className="w-full bg-[#1a1a1a] border border-amber-500/50 rounded p-3 text-white focus:outline-none focus:border-amber-400 font-bold"
+                  />
                 </div>
               </div>
 
@@ -479,7 +609,63 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* القسم الرابع: استيراد ملف الإكسل */}
+        {/* 4. إعدادات برنامج الولاء وسعر صرف النقطة (التبويب الجديد) */}
+        {activeTab === 'loyalty_settings' && (
+          <div className="max-w-2xl mx-auto bg-[#121212] p-8 rounded-xl border border-[#1f1f1f]">
+            <div className="flex items-center gap-3 mb-6 border-b border-[#333] pb-4">
+              <div className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-400">
+                <Award className="w-7 h-7" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold">Loyalty Exchange Rate & Economy</h2>
+                <p className="text-xs text-gray-400">Control how much each loyalty point is worth when customers redeem rewards.</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleSaveLoyaltySettings} className="space-y-6">
+              <div className="bg-[#1a1a1a] p-6 rounded-xl border border-[#333]">
+                <label className="block text-sm font-bold uppercase tracking-wider text-amber-400 mb-2">
+                  1 Loyalty Point Value (in USD)
+                </label>
+                <div className="relative">
+                  <span className="absolute left-4 top-3.5 text-gray-400 font-bold">$</span>
+                  <input 
+                    type="number" 
+                    step="0.001" 
+                    value={pointValueUsd}
+                    onChange={(e) => setPointValueUsd(parseFloat(e.target.value) || 0)}
+                    className="w-full bg-[#121212] border border-[#333] rounded-lg p-3 pl-8 text-xl font-extrabold text-white focus:outline-none focus:border-amber-400"
+                    required
+                  />
+                </div>
+                <p className="text-xs text-gray-400 mt-3 leading-relaxed">
+                  💡 <strong className="text-white">Example Calculation:</strong> If set to <strong className="text-amber-400">$0.05</strong>, a customer with <strong className="text-white">100 points</strong> will receive a <strong className="text-amber-400">$5.00 discount</strong> upon checkout.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 bg-[#1a1a1a] p-4 rounded-xl border border-[#333] text-center">
+                <div>
+                  <p className="text-xs text-gray-400 uppercase font-bold">500 Points Equals</p>
+                  <p className="text-2xl font-black text-amber-400 mt-1">${(500 * pointValueUsd).toFixed(2)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-400 uppercase font-bold">1,000 Points Equals</p>
+                  <p className="text-2xl font-black text-amber-400 mt-1">${(1000 * pointValueUsd).toFixed(2)}</p>
+                </div>
+              </div>
+
+              <button 
+                type="submit" 
+                disabled={savingLoyalty}
+                className="w-full bg-amber-600 hover:bg-amber-500 text-white font-bold py-4 rounded-xl transition shadow-[0_0_15px_rgba(245,158,11,0.3)]"
+              >
+                {savingLoyalty ? "Saving..." : "Save Loyalty Settings"}
+              </button>
+            </form>
+          </div>
+        )}
+
+        {/* 5. استيراد ملف الإكسل */}
         {activeTab === 'import_excel' && (
           <div className="max-w-2xl mx-auto bg-[#121212] p-8 rounded-xl border border-[#1f1f1f] text-center">
             <FileSpreadsheet className="w-16 h-16 text-green-500 mx-auto mb-4" />
@@ -506,7 +692,7 @@ export default function AdminDashboard() {
                   <>
                     <Upload className="w-10 h-10 text-gray-400 mb-3" />
                     <p className="font-bold text-lg mb-1">Click or drag Excel file here</p>
-                    <p className="text-sm text-gray-500">Supports columns: Name, Regular Price, Category, Image URL, Description</p>
+                    <p className="text-sm text-gray-500">Supports columns: Name, Regular Price, Category, Image URL, Description, Points</p>
                   </>
                 )}
               </div>
@@ -522,7 +708,7 @@ export default function AdminDashboard() {
 
       </div>
 
-      {/* نافذة التعديل المنبثقة تدعم إضافة/حذف صور متعددة (Edit Modal) */}
+      {/* نافذة التعديل المنبثقة تدعم تعديل النقاط أيضاً */}
       {editingProduct && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 overflow-y-auto">
           <div className="bg-[#121212] border border-[#333] rounded-2xl p-6 md:p-8 max-w-lg w-full relative shadow-2xl my-8">
@@ -534,7 +720,7 @@ export default function AdminDashboard() {
             </button>
 
             <h3 className="text-xl font-bold mb-6 border-b border-[#333] pb-4 flex items-center gap-2">
-              <Edit3 className="text-[#00AEEF] w-5 h-5" /> Edit Product & Gallery
+              <Edit3 className="text-[#00AEEF] w-5 h-5" /> Edit Product & Loyalty
             </h3>
 
             <form onSubmit={handleUpdateProduct} className="space-y-4">
@@ -549,7 +735,7 @@ export default function AdminDashboard() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="block text-sm text-gray-400 mb-1">Price ($ USD)</label>
                   <input 
@@ -575,9 +761,20 @@ export default function AdminDashboard() {
                     <option value="Equipment">Equipment</option>
                   </select>
                 </div>
+                <div>
+                  <label className="block text-sm text-amber-400 font-bold mb-1 flex items-center gap-1">
+                    <Award className="w-4 h-4" /> Points
+                  </label>
+                  <input 
+                    type="number" 
+                    value={editForm.loyaltyPoints}
+                    onChange={(e) => setEditForm({...editForm, loyaltyPoints: e.target.value})}
+                    className="w-full bg-[#1a1a1a] border border-amber-500/50 rounded p-3 text-white focus:outline-none focus:border-amber-400 font-bold"
+                    required
+                  />
+                </div>
               </div>
 
-              {/* قسم إدارة الصور المتعددة داخل النافذة المنبثقة */}
               <div>
                 <div className="flex justify-between items-center mb-2">
                   <label className="block text-sm text-gray-400">Product Image URLs (Gallery)</label>

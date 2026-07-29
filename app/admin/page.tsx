@@ -279,13 +279,12 @@ export default function AdminDashboard() {
       .eq('id', orderId)
       .single();
 
-    // 2. إذا ضغطت على Delivered وكان هناك حساب للزبون ولم يأخذ نقاطه بعد
-    if (newStatus === 'Delivered' && order && !order.points_awarded && order.user_id) {
+    // 2. عند تحويل الطلب إلى Delivered وكان مربوطاً بحساب زبون
+    if (newStatus === 'Delivered' && order && order.user_id && !order.points_awarded) {
       
-      // سحب النقاط المسجلة في الطلب (وإذا كانت فارغة يعطي 20 نقطة كحد أدنى)
-      const pointsToAdd = Number(order.points_earned) || 20;
+      const pointsToAdd = Number(order.points_earned) > 0 ? Number(order.points_earned) : 20;
 
-      // جلب نقاط الزبون الحالية من حسابه
+      // جلب رصيد الزبون الحالي
       const { data: profile } = await supabase
         .from('profiles')
         .select('loyalty_points')
@@ -295,21 +294,25 @@ export default function AdminDashboard() {
       const currentPoints = Number(profile?.loyalty_points) || 0;
       const newPointsTotal = currentPoints + pointsToAdd;
 
-      // إضافة النقاط لحساب الزبون
-      await supabase
+      // إضافة النقاط لرصيد حساب الزبون
+      const { error: profileError } = await supabase
         .from('profiles')
         .update({ loyalty_points: newPointsTotal })
         .eq('id', order.user_id);
 
-      // تحديث الطلب وتأكيد منح النقاط
-      await supabase
-        .from('orders')
-        .update({ status: newStatus, points_awarded: true, points_earned: pointsToAdd })
-        .eq('id', orderId);
+      if (!profileError) {
+        // تحديث حالة الطلب وتأكيد أن النقاط صُبّت بنجاح
+        await supabase
+          .from('orders')
+          .update({ status: newStatus, points_awarded: true, points_earned: pointsToAdd })
+          .eq('id', orderId);
 
-      alert(`✅ تم تسليم الطلب وإضافة +${pointsToAdd} نقطة لرصيد الزبون بنجاح!`);
+        alert(`✅ تم تسليم الطلب وإضافة +${pointsToAdd} PTS بنجاح! الرصيد الجديد للزبون: ${newPointsTotal} PTS`);
+      } else {
+        alert("🚨 حدث خطأ أثناء تحديث رصيد الزبون: " + profileError.message);
+      }
     } else {
-      // إذا لم يكن هناك حساب أو تم التسليم مسبقاً، نكتفي بتغيير حالة الطلب فقط
+      // تحديث الحالة العادي للطلبات غير المربوطة بحساب أو التي تم منح نقاطها مسبقاً
       await supabase
         .from('orders')
         .update({ status: newStatus })
@@ -318,7 +321,6 @@ export default function AdminDashboard() {
 
     fetchOrders();
   };
-
   if (!isAuthenticated) {
     return (
       <div className="bg-[#0a0a0a] min-h-screen flex items-center justify-center p-6 text-white">

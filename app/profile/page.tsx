@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useCartStore } from '@/store/cart';
 import { useRouter } from 'next/navigation';
-import { Award, ShoppingBag, Truck, CheckCircle2, Clock, Gift, Crown, RefreshCw, LogOut, ArrowRight, ShieldCheck } from 'lucide-react';
+import { Award, ShoppingBag, Truck, CheckCircle2, Clock, Gift, Crown, RefreshCw, LogOut, ArrowRight, ShieldCheck, DollarSign } from 'lucide-react';
 import Link from 'next/link';
 
 export default function CustomerProfilePage() {
@@ -14,10 +14,12 @@ export default function CustomerProfilePage() {
   const [loading, setLoading] = useState(true);
   const [redeemedCode, setRedeemedCode] = useState<string | null>(null);
 
+  // سعر صرف النقطة بالدولار (يُسحب تلقائياً من الداشبورد)
+  const [pointValueUsd, setPointValueUsd] = useState<number>(0.05);
+
   const { addItem } = useCartStore();
   const router = useRouter();
 
-  // جلب بيانات الحساب ورصيد النقاط وسجل الطلبات
   const fetchCustomerData = async () => {
     setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
@@ -29,7 +31,18 @@ export default function CustomerProfilePage() {
 
     setUser(user);
 
-    // جلب البروفايل والنقاط
+    // 1. جلب إعدادات صرف النقاط من جدول store_settings
+    const { data: storeSettings } = await supabase
+      .from('store_settings')
+      .select('loyalty_point_value_usd')
+      .eq('id', 1)
+      .single();
+
+    if (storeSettings && storeSettings.loyalty_point_value_usd) {
+      setPointValueUsd(Number(storeSettings.loyalty_point_value_usd));
+    }
+
+    // 2. جلب حساب الزبون ورصيد النقاط
     const { data: profileData } = await supabase
       .from('profiles')
       .select('*')
@@ -39,7 +52,6 @@ export default function CustomerProfilePage() {
     if (profileData) {
       setProfile(profileData);
     } else {
-      // إنشاء بروفايل أولي إذا كان العميل جديداً
       const defaultProfile = {
         id: user.id,
         full_name: user.user_metadata?.full_name || 'Football District Member',
@@ -50,7 +62,7 @@ export default function CustomerProfilePage() {
       setProfile(defaultProfile);
     }
 
-    // جلب طلبات هذا الزبون فقط
+    // 3. جلب طلبات العميل
     const { data: ordersData } = await supabase
       .from('orders')
       .select('*')
@@ -70,7 +82,6 @@ export default function CustomerProfilePage() {
     router.push('/catalog');
   };
 
-  // وظيفة إعادة طلب نفس المنتجات السابقة
   const handleReorder = (orderItems: any[]) => {
     if (Array.isArray(orderItems)) {
       orderItems.forEach((item) => {
@@ -87,18 +98,16 @@ export default function CustomerProfilePage() {
     }
   };
 
-  // وظيفة استبدال النقاط بكود خصم
   const handleRedeemReward = (pointsCost: number, rewardValue: number) => {
     const currentPoints = profile?.loyalty_points || 0;
     if (currentPoints < pointsCost) {
-      alert("⚠️ You don't have enough points for this reward yet!");
+      alert(`⚠️ You need ${pointsCost} points for this reward. Keep shopping to earn more!`);
       return;
     }
 
     const newPoints = currentPoints - pointsCost;
     const generatedCode = `FD-${rewardValue}OFF-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
     
-    // خصم النقاط من قاعدة البيانات
     supabase
       .from('profiles')
       .update({ loyalty_points: newPoints })
@@ -142,7 +151,6 @@ export default function CustomerProfilePage() {
     );
   }
 
-  // حساب مستوى العميل (FUT Tier Logic)
   const pts = profile?.loyalty_points || 0;
   let tier = { name: "BRONZE MEMBER 🥉", next: 200, color: "from-amber-800 to-amber-950", border: "border-amber-700" };
   if (pts >= 1000) {
@@ -154,6 +162,11 @@ export default function CustomerProfilePage() {
   }
 
   const progressPercent = Math.min(100, Math.round((pts / tier.next) * 100));
+
+  // حساب أسعار النقاط المطلوبة للمكافآت بناءً على سعر صرف الدولار الحي
+  // مثلاً: إذا كان pointValueUsd = 0.05 -> قسيمة 5$ تحتاج (5 / 0.05) = 100 نقطة
+  const voucher5Points = Math.max(10, Math.round(5 / pointValueUsd));
+  const voucher15Points = Math.max(30, Math.round(15 / pointValueUsd));
 
   return (
     <div className="bg-[#0a0a0a] min-h-screen py-12 text-white">
@@ -181,7 +194,7 @@ export default function CustomerProfilePage() {
           {/* العمود الأيسر: بطاقة الولاء (FUT Card Style) والمكافآت */}
           <div className="lg:col-span-5 space-y-6">
             
-            {/* بطاقة الولاء الرقمية */}
+            {/* بطاقة الولاء */}
             <div className={`bg-gradient-to-br ${tier.color} p-6 rounded-2xl border ${tier.border} shadow-2xl relative overflow-hidden`}>
               <div className="absolute -right-6 -bottom-6 opacity-10">
                 <Crown className="w-48 h-48 text-white" />
@@ -213,7 +226,14 @@ export default function CustomerProfilePage() {
               </div>
             </div>
 
-            {/* عرض كود الخصم المستبدل إن وجد */}
+            {/* عرض قيمة صرف النقطة التفاعلي للمستخدم */}
+            <div className="p-3.5 bg-[#121212] border border-[#1f1f1f] rounded-xl flex items-center justify-between text-xs text-gray-300">
+              <span className="flex items-center gap-1.5 font-semibold">
+                <DollarSign className="w-4 h-4 text-amber-400" /> Current Exchange Rate:
+              </span>
+              <span className="font-bold text-amber-400">1 PT = ${pointValueUsd.toFixed(3)} USD</span>
+            </div>
+
             {redeemedCode && (
               <div className="bg-green-950/40 border border-green-500 rounded-xl p-4 text-center">
                 <p className="text-xs text-green-300 font-bold uppercase mb-1">Active Discount Code</p>
@@ -222,33 +242,35 @@ export default function CustomerProfilePage() {
               </div>
             )}
 
-            {/* متجر مكافآت النقاط (Redeem Rewards) */}
+            {/* متجر مكافآت النقاط الديناميكي */}
             <div className="bg-[#121212] p-6 rounded-2xl border border-[#1f1f1f] space-y-4">
               <h3 className="font-bold text-lg border-b border-[#222] pb-3 flex items-center gap-2">
                 <Gift className="w-5 h-5 text-amber-400" /> Redeem Rewards
               </h3>
 
               <div className="space-y-3">
+                {/* مكافأة $5 */}
                 <div className="flex items-center justify-between p-3.5 bg-[#1a1a1a] rounded-xl border border-[#262626]">
                   <div>
                     <p className="font-bold text-sm">$5.00 Off Voucher</p>
-                    <p className="text-xs text-gray-400">Requires 100 PTS</p>
+                    <p className="text-xs text-gray-400">Requires {voucher5Points} PTS</p>
                   </div>
                   <button
-                    onClick={() => handleRedeemReward(100, 5)}
+                    onClick={() => handleRedeemReward(voucher5Points, 5)}
                     className="bg-amber-600 hover:bg-amber-500 text-white text-xs font-extrabold px-4 py-2 rounded-lg transition"
                   >
                     Redeem
                   </button>
                 </div>
 
+                {/* مكافأة $15 */}
                 <div className="flex items-center justify-between p-3.5 bg-[#1a1a1a] rounded-xl border border-[#262626]">
                   <div>
                     <p className="font-bold text-sm">$15.00 Off Voucher</p>
-                    <p className="text-xs text-gray-400">Requires 250 PTS</p>
+                    <p className="text-xs text-gray-400">Requires {voucher15Points} PTS</p>
                   </div>
                   <button
-                    onClick={() => handleRedeemReward(250, 15)}
+                    onClick={() => handleRedeemReward(voucher15Points, 15)}
                     className="bg-amber-600 hover:bg-amber-500 text-white text-xs font-extrabold px-4 py-2 rounded-lg transition"
                   >
                     Redeem
@@ -259,7 +281,7 @@ export default function CustomerProfilePage() {
 
           </div>
 
-          {/* العمود الأيمن: سجل الطلبات (My Order History) */}
+          {/* العمود الأيمن: سجل الطلبات */}
           <div className="lg:col-span-7 space-y-6">
             <div className="bg-[#121212] p-6 md:p-8 rounded-2xl border border-[#1f1f1f]">
               <div className="flex justify-between items-center mb-6 border-b border-[#222] pb-4">
@@ -305,7 +327,6 @@ export default function CustomerProfilePage() {
                         </span>
                       </div>
 
-                      {/* قائمة قطع البدلات المطلوبة */}
                       <div className="space-y-1 py-2 border-y border-[#242424]">
                         {Array.isArray(order.items) && order.items.map((item: any, i: number) => (
                           <div key={i} className="flex justify-between text-sm">
@@ -324,7 +345,6 @@ export default function CustomerProfilePage() {
                           </span>
                         </div>
 
-                        {/* زر إعادة طلب نفس البدلات فوراً */}
                         <button
                           onClick={() => handleReorder(order.items)}
                           className="text-xs bg-[#222] hover:bg-[#00AEEF] hover:text-white text-gray-300 font-bold px-3.5 py-2 rounded-lg transition border border-[#333]"

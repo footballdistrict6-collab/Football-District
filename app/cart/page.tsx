@@ -78,9 +78,12 @@ export default function CartPage() {
                   <span className="text-[#00AEEF]">${total.toFixed(2)}</span>
                 </div>
                 
-                <button className="w-full bg-[#00AEEF] text-white font-bold py-4 rounded hover:bg-blue-500 transition shadow-[0_0_15px_rgba(0,174,239,0.3)]">
-                  Proceed to Checkout
-                </button>
+                <Link 
+                    href="/checkout" 
+                    className="w-full bg-[#00AEEF] text-white font-bold py-4 rounded hover:bg-blue-500 transition shadow-[0_0_15px_rgba(0,174,239,0.3)] block text-center"
+                        >
+                    Proceed to Checkout
+                </Link>
               </div>
             </div>
 

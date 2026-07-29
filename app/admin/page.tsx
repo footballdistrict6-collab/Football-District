@@ -2,14 +2,17 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Package, ShoppingBag, Plus, RefreshCw, CheckCircle2, Clock } from 'lucide-react';
+import { Package, ShoppingBag, Plus, RefreshCw, CheckCircle2, Clock, Upload, FileSpreadsheet, Loader2 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 export default function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState<'orders' | 'add_product'>('orders');
+  const [activeTab, setActiveTab] = useState<'orders' | 'add_product' | 'import_excel'>('orders');
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [importing, setImporting] = useState(false);
+  const [importStatus, setImportStatus] = useState<string | null>(null);
 
-  // حقول إضافة منتج جديد
+  // حقول إضافة منتج جديد يدوياً
   const [newProduct, setNewProduct] = useState({
     title: '',
     price: '',
@@ -18,10 +21,9 @@ export default function AdminDashboard() {
     imageUrl: ''
   });
 
-  // جلب الطلبات من قاعدة البيانات
   const fetchOrders = async () => {
     setLoading(true);
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('orders')
       .select('*')
       .order('created_at', { ascending: false });
@@ -34,7 +36,6 @@ export default function AdminDashboard() {
     fetchOrders();
   }, []);
 
-  // وظيفة إضافة منتج جديد بسهولة
   const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     const { error } = await supabase.from('products').insert([
@@ -43,7 +44,7 @@ export default function AdminDashboard() {
         price: parseFloat(newProduct.price),
         category: newProduct.category,
         season: newProduct.season,
-        image_urls: [newProduct.imageUrl], // حفظ الصورة كمصفوفة تلقائياً لتجنب خطأ Array
+        image_urls: [newProduct.imageUrl],
         is_retro: false
       }
     ]);
@@ -56,7 +57,59 @@ export default function AdminDashboard() {
     }
   };
 
-  // وظيفة تغيير حالة الطلب (مثلاً من Pending إلى Delivered)
+  // وظيفة استيراد المنتجات من ملف الإكسل
+  const handleExcelUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImporting(true);
+    setImportStatus("جاري قراءة ملف الإكسل...");
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const data = new Uint8Array(event.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        
+        // تحويل الجدول إلى قائمة Object
+        const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet);
+
+        setImportStatus(`تم العثور على ${jsonData.length} منتج، جاري إدخالها في قاعدة البيانات...`);
+
+        // تجهيز المنتجات لـ Supabase بناءً على أسماء الأعمدة في ملف الإكسل الخاص بك
+        const formattedProducts = jsonData.map((row) => ({
+          title: row['Name'] || row['title'] || 'Unnamed Product',
+          price: parseFloat(row['Regular Price'] || row['price'] || 0),
+          category: row['Category'] || 'Jerseys',
+          season: '2026-2027',
+          description: row['Description'] || '',
+          // نضع الصورة داخل مصفوفة ARRAY لتجنب خطأ Array في Supabase
+          image_urls: row['Image URL'] ? [row['Image URL']] : ['https://images.unsplash.com/photo-1583318433420-532155e9d9e4?q=80&w=500&auto=format&fit=crop'],
+          is_retro: false
+        }));
+
+        // إدخال كل المنتجات دفعة واحدة إلى جدول products
+        const { error } = await supabase.from('products').insert(formattedProducts);
+
+        if (error) {
+          throw error;
+        }
+
+        alert(`✅ تم استيراد ${formattedProducts.length} منتجاً بنجاح من ملف الإكسل!`);
+        setImportStatus("تم الاستيراد بنجاح! يمكنك مراجعة الكتالوج الآن.");
+      } catch (error: any) {
+        alert("🚨 حدث خطأ أثناء الاستيراد: " + error.message);
+        setImportStatus("فشل الاستيراد.");
+      } finally {
+        setImporting(false);
+      }
+    };
+
+    reader.readAsArrayBuffer(file);
+  };
+
   const updateOrderStatus = async (orderId: string, newStatus: string) => {
     await supabase.from('orders').update({ status: newStatus }).eq('id', orderId);
     fetchOrders();
@@ -75,23 +128,29 @@ export default function AdminDashboard() {
             <p className="text-gray-400 text-sm mt-1">Football District Control Center</p>
           </div>
 
-          <div className="flex gap-4">
+          <div className="flex flex-wrap gap-3">
             <button 
               onClick={() => setActiveTab('orders')}
-              className={`px-6 py-3 rounded-lg font-bold flex items-center gap-2 transition ${activeTab === 'orders' ? 'bg-[#00AEEF] text-white' : 'bg-[#121212] text-gray-400 hover:text-white'}`}
+              className={`px-5 py-3 rounded-lg font-bold flex items-center gap-2 transition ${activeTab === 'orders' ? 'bg-[#00AEEF] text-white' : 'bg-[#121212] text-gray-400 hover:text-white'}`}
             >
-              <ShoppingBag className="w-5 h-5" /> Customer Orders ({orders.length})
+              <ShoppingBag className="w-5 h-5" /> Orders ({orders.length})
             </button>
             <button 
               onClick={() => setActiveTab('add_product')}
-              className={`px-6 py-3 rounded-lg font-bold flex items-center gap-2 transition ${activeTab === 'add_product' ? 'bg-[#00AEEF] text-white' : 'bg-[#121212] text-gray-400 hover:text-white'}`}
+              className={`px-5 py-3 rounded-lg font-bold flex items-center gap-2 transition ${activeTab === 'add_product' ? 'bg-[#00AEEF] text-white' : 'bg-[#121212] text-gray-400 hover:text-white'}`}
             >
-              <Plus className="w-5 h-5" /> Add New Product
+              <Plus className="w-5 h-5" /> Add Manual
+            </button>
+            <button 
+              onClick={() => setActiveTab('import_excel')}
+              className={`px-5 py-3 rounded-lg font-bold flex items-center gap-2 transition ${activeTab === 'import_excel' ? 'bg-green-600 text-white' : 'bg-[#121212] text-gray-400 hover:text-white'}`}
+            >
+              <FileSpreadsheet className="w-5 h-5" /> Import Excel
             </button>
           </div>
         </div>
 
-        {/* القسم الأول: جدول إدارة الطلبات */}
+        {/* القسم الأول: طلبات الزبائن */}
         {activeTab === 'orders' && (
           <div>
             <div className="flex justify-between items-center mb-6">
@@ -111,8 +170,6 @@ export default function AdminDashboard() {
               <div className="space-y-6">
                 {orders.map((order) => (
                   <div key={order.id} className="bg-[#121212] p-6 rounded-xl border border-[#1f1f1f] flex flex-col md:flex-row justify-between gap-6">
-                    
-                    {/* بيانات الزبون */}
                     <div className="space-y-2">
                       <div className="flex items-center gap-3">
                         <span className="font-bold text-lg">{order.first_name} {order.last_name}</span>
@@ -126,7 +183,6 @@ export default function AdminDashboard() {
                       <p className="text-xs text-gray-500">Ordered: {new Date(order.created_at).toLocaleString()}</p>
                     </div>
 
-                    {/* المنتجات المطلوبة */}
                     <div className="bg-[#1a1a1a] p-4 rounded-lg flex-1">
                       <p className="text-xs text-gray-400 uppercase font-bold mb-2">Items Ordered:</p>
                       <div className="space-y-1">
@@ -143,7 +199,6 @@ export default function AdminDashboard() {
                       </div>
                     </div>
 
-                    {/* زر تحديث الحالة */}
                     <div className="flex md:flex-col justify-end gap-2">
                       {order.status !== 'Delivered' ? (
                         <button 
@@ -161,7 +216,6 @@ export default function AdminDashboard() {
                         </button>
                       )}
                     </div>
-
                   </div>
                 ))}
               </div>
@@ -169,18 +223,15 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* القسم الثاني: إضافة منتج جديد للكتالوج بسهولة */}
+        {/* القسم الثاني: إضافة منتج يدوياً */}
         {activeTab === 'add_product' && (
           <div className="max-w-2xl mx-auto bg-[#121212] p-8 rounded-xl border border-[#1f1f1f]">
-            <h2 className="text-2xl font-bold mb-6 border-b border-[#333] pb-4">Add New Jersey / Product</h2>
-            
+            <h2 className="text-2xl font-bold mb-6 border-b border-[#333] pb-4">Add Single Product</h2>
             <form onSubmit={handleAddProduct} className="space-y-6">
               <div>
                 <label className="block text-sm text-gray-400 mb-2">Product Title</label>
                 <input 
-                  required
-                  type="text" 
-                  value={newProduct.title}
+                  required type="text" value={newProduct.title}
                   onChange={(e) => setNewProduct({...newProduct, title: e.target.value})}
                   placeholder="e.g. Arsenal 26/27 Home Jersey" 
                   className="w-full bg-[#1a1a1a] border border-[#333] rounded p-3 text-white focus:outline-none focus:border-[#00AEEF]"
@@ -191,16 +242,12 @@ export default function AdminDashboard() {
                 <div>
                   <label className="block text-sm text-gray-400 mb-2">Price ($ USD)</label>
                   <input 
-                    required
-                    type="number" 
-                    step="0.01"
-                    value={newProduct.price}
+                    required type="number" step="0.01" value={newProduct.price}
                     onChange={(e) => setNewProduct({...newProduct, price: e.target.value})}
-                    placeholder="119.99" 
+                    placeholder="23.99" 
                     className="w-full bg-[#1a1a1a] border border-[#333] rounded p-3 text-white focus:outline-none focus:border-[#00AEEF]"
                   />
                 </div>
-
                 <div>
                   <label className="block text-sm text-gray-400 mb-2">Category</label>
                   <select 
@@ -208,11 +255,11 @@ export default function AdminDashboard() {
                     onChange={(e) => setNewProduct({...newProduct, category: e.target.value})}
                     className="w-full bg-[#1a1a1a] border border-[#333] rounded p-3 text-white focus:outline-none focus:border-[#00AEEF]"
                   >
-                    <option value="Jerseys">Jerseys</option>
+                    <option value="Home Jerseys">Home Jerseys</option>
+                    <option value="Away Jerseys">Away Jerseys</option>
+                    <option value="Third Jerseys">Third Jerseys</option>
                     <option value="Retro Jerseys">Retro Jerseys</option>
-                    <option value="Football Boots">Football Boots</option>
                     <option value="Equipment">Equipment</option>
-                    <option value="Accessories">Accessories</option>
                   </select>
                 </div>
               </div>
@@ -220,23 +267,58 @@ export default function AdminDashboard() {
               <div>
                 <label className="block text-sm text-gray-400 mb-2">Image URL</label>
                 <input 
-                  required
-                  type="url" 
-                  value={newProduct.imageUrl}
+                  required type="url" value={newProduct.imageUrl}
                   onChange={(e) => setNewProduct({...newProduct, imageUrl: e.target.value})}
-                  placeholder="https://images.unsplash.com/..." 
+                  placeholder="https://..." 
                   className="w-full bg-[#1a1a1a] border border-[#333] rounded p-3 text-white focus:outline-none focus:border-[#00AEEF]"
                 />
-                <p className="text-xs text-gray-500 mt-1">Paste any direct image link here.</p>
               </div>
 
-              <button 
-                type="submit" 
-                className="w-full bg-[#00AEEF] hover:bg-blue-500 text-white font-bold py-4 rounded transition shadow-[0_0_15px_rgba(0,174,239,0.3)] mt-4"
-              >
-                Publish Product to Catalog 🚀
+              <button type="submit" className="w-full bg-[#00AEEF] hover:bg-blue-500 text-white font-bold py-4 rounded transition shadow-[0_0_15px_rgba(0,174,239,0.3)] mt-4">
+                Publish Product 🚀
               </button>
             </form>
+          </div>
+        )}
+
+        {/* القسم الثالث الجديد: استيراد ملف الإكسل مباشرة */}
+        {activeTab === 'import_excel' && (
+          <div className="max-w-2xl mx-auto bg-[#121212] p-8 rounded-xl border border-[#1f1f1f] text-center">
+            <FileSpreadsheet className="w-16 h-16 text-green-500 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold mb-2">Import Products from Excel</h2>
+            <p className="text-gray-400 mb-8">
+              Upload your Excel (.xlsx) or (.csv) spreadsheet to automatically import all your jerseys at once.
+            </p>
+
+            <div className="border-2 border-dashed border-[#333] hover:border-green-500 transition rounded-xl p-10 bg-[#1a1a1a] relative cursor-pointer mb-6">
+              <input 
+                type="file" 
+                accept=".xlsx, .xls, .csv"
+                onChange={handleExcelUpload}
+                disabled={importing}
+                className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+              />
+              <div className="flex flex-col items-center justify-center">
+                {importing ? (
+                  <>
+                    <Loader2 className="w-10 h-10 text-green-500 animate-spin mb-3" />
+                    <p className="font-bold text-lg">Importing products...</p>
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-10 h-10 text-gray-400 mb-3" />
+                    <p className="font-bold text-lg mb-1">Click or drag Excel file here</p>
+                    <p className="text-sm text-gray-500">Supports columns: Name, Regular Price, Category, Image URL, Description</p>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {importStatus && (
+              <div className="p-4 bg-[#1a1a1a] rounded-lg border border-[#333] text-sm text-green-400">
+                {importStatus}
+              </div>
+            )}
           </div>
         )}
 

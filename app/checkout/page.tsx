@@ -41,11 +41,12 @@ export default function CheckoutPage() {
   const total = subtotal + shipping;
 
   // حساب إجمالي نقاط الولاء المكتسبة من هذه السلة (الافتراضي 20 نقطة للقطعة إن لم تحدد)
-  const totalPointsEarned = items.reduce((sum, item: any) => {
-    const pts = item.loyalty_points_earned || 20;
-    return sum + (pts * item.quantity);
+// حساب إجمالي نقاط الولاء المكتسبة بناءً على القيم الفعلية المحفوظة في السلة
+const totalPointsEarned = items.reduce((sum, item: any) => {
+    const pts = Number(item.loyalty_points_earned) || 20;
+    return sum + (pts * (Number(item.quantity) || 1));
   }, 0);
-
+  
   const handleSubmitOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (items.length === 0) return;

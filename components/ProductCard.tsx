@@ -24,16 +24,16 @@ export default function ProductCard({
   const { addItem } = useCartStore();
 
   const handleAddToCart = (e: React.MouseEvent) => {
-    e.preventDefault(); // لمنع الرابط من فتح صفحة المنتج عند الضغط على أيقونة السلة
+    e.preventDefault(); 
     e.stopPropagation();
 
     addItem({
-      id: `${id}-L`, // المقاس الافتراضي عند الإضافة السريعة
+      id: `${id}-L`,
       title: title,
       price: price.toString(),
       image: imageUrl || 'https://images.unsplash.com/photo-1583318433420-532155e9d9e4?q=80&w=500&auto=format&fit=crop',
       quantity: 1,
-      // حفظ النقاط الحقيقية الخاصة بهذا القميص في السلة
+      // السطر الحاسم: حفظ النقاط المخصصة (مثل 1000) مع العنصر في السلة
       loyalty_points_earned: Number(loyaltyPoints) || 20
     });
 
@@ -44,20 +44,17 @@ export default function ProductCard({
     <Link href={`/product/${id}`} className="block group">
       <div className="bg-[#121212] border border-[#1f1f1f] rounded-lg overflow-hidden group-hover:border-[#00AEEF] transition duration-300">
         
-        {/* صورة المنتج */}
         <div className="h-64 bg-[#1a1a1a] flex items-center justify-center overflow-hidden relative">
           <img 
             src={imageUrl} 
             alt={title} 
             className="object-cover h-full w-full group-hover:scale-105 transition duration-500 opacity-80 group-hover:opacity-100" 
           />
-          {/* شارة توضح للزبون كم نقطة سيربح من هذا القميص */}
           <span className="absolute bottom-2 right-2 bg-black/80 text-amber-400 border border-amber-500/30 text-[10px] font-bold px-2 py-1 rounded flex items-center gap-1">
             <Award className="w-3 h-3" /> +{loyaltyPoints} PTS
           </span>
         </div>
 
-        {/* تفاصيل المنتج */}
         <div className="p-5">
           <span className="text-[#00AEEF] text-xs font-bold uppercase tracking-wider">{category}</span>
           <h3 className="text-lg font-semibold text-white mt-1 mb-3 truncate">{title}</h3>

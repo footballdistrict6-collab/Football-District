@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useCartStore } from '@/store/cart';
-import { ShoppingCart, User, Search, X } from 'lucide-react';
+import { ShoppingCart, Search, X, User } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -58,9 +58,8 @@ export default function Navbar() {
             </Link>
           </div>
 
-          {/* الأيقونات على اليمين */}
+          {/* الأيقونات على اليمين - بحث، بروفايل الزبون، وسلة */}
           <div className="flex items-center gap-6">
-            {/* زر البحث الفعلي */}
             <button 
               onClick={() => setIsSearchOpen(true)}
               className="text-gray-300 hover:text-white transition"
@@ -69,11 +68,16 @@ export default function Navbar() {
               <Search className="w-5 h-5" />
             </button>
 
-            <Link href="/admin" className="text-gray-300 hover:text-white transition" title="Admin Dashboard">
+            {/* زر بروفايل الزبون (ينقل لصفحة الولاء وسجل الطلبات فقط) */}
+            <Link 
+              href="/profile" 
+              className="text-gray-300 hover:text-[#00AEEF] transition" 
+              title="My Account & Loyalty Rewards"
+            >
               <User className="w-5 h-5" />
             </Link>
 
-            <Link href="/cart" className="relative text-gray-300 hover:text-white transition">
+            <Link href="/cart" className="relative text-gray-300 hover:text-white transition" title="Shopping Cart">
               <ShoppingCart className="w-5 h-5" />
               {mounted && cartCount() > 0 && (
                 <span className="absolute -top-2 -right-2 bg-[#00AEEF] text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">
@@ -86,7 +90,7 @@ export default function Navbar() {
         </div>
       </nav>
 
-      {/* نافذة البحث المنبثقة (Search Modal) */}
+      {/* نافذة البحث المنبثقة */}
       {isSearchOpen && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-start justify-center pt-24 px-4">
           <div className="bg-[#121212] border border-[#333] rounded-2xl p-6 max-w-xl w-full shadow-2xl relative">

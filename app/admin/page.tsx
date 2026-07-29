@@ -269,10 +269,48 @@ export default function AdminDashboard() {
   };
 
   const updateOrderStatus = async (orderId: string, newStatus: string) => {
-    await supabase.from('orders').update({ status: newStatus }).eq('id', orderId);
+    // 1. جلب بيانات الطلب لمعرفة النقاط ورابط الزبون
+    const { data: order } = await supabase
+      .from('orders')
+      .select('*')
+      .eq('id', orderId)
+      .single();
+
+    if (newStatus === 'Delivered' && order && !order.points_awarded && order.points_earned > 0 && order.user_id) {
+      // 2. جلب رصيد نقاط الزبون الحالي من جدول profiles
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('loyalty_points')
+        .eq('id', order.user_id)
+        .single();
+
+      const currentPoints = profile?.loyalty_points || 0;
+      const newPointsTotal = currentPoints + order.points_earned;
+
+      // 3. إضافة النقاط لرصيد الزبون
+      await supabase
+        .from('profiles')
+        .update({ loyalty_points: newPointsTotal })
+        .eq('id', order.user_id);
+
+      // 4. تحديث الطلب وتحديد أنه تم منح النقاط حتى لا تُمنح مرتين
+      await supabase
+        .from('orders')
+        .update({ status: newStatus, points_awarded: true })
+        .eq('id', orderId);
+
+      alert(`✅ تم تسليم الطلب بنجاح وإضافة ${order.points_earned} نقطة لرصيد الزبون!`);
+    } else {
+      // تحديث الحالة العادي في حال لم يكن الطلب مربوطاً بحساب أو تم منحه مسبقاً
+      await supabase
+        .from('orders')
+        .update({ status: newStatus })
+        .eq('id', orderId);
+    }
+
     fetchOrders();
   };
-
+  
   if (!isAuthenticated) {
     return (
       <div className="bg-[#0a0a0a] min-h-screen flex items-center justify-center p-6 text-white">

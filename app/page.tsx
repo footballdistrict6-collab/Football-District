@@ -42,7 +42,7 @@ export default function HomePage() {
       subtitle: "Stand out on the pitch",
       category: "Away Jerseys",
       // صورة لاعب بقميص احتياطي مميز على أرض الملعب
-      image: "https://images.unsplash.com/photo-1508098682722-e99c43a406b2?q=80&w=800&auto=format&fit=crop",
+      image: "https://th.bing.com/th/id/R.afc2c4c14920f784173c605ec15e32a6?rik=61XwzN4xXSQEYQ&riu=http%3a%2f%2fwww.ultrafootball.com%2fcdn%2fshop%2farticles%2fAdidas_World_Cup_2026_Away_Jerseys_Bring_Culture_Front_and_Centre.jpg%3fv%3d1773979677&ehk=5qeHF6dE%2fmAarPOFJK1m2DNzEGb5ENP1DxWtB0Hbu0Q%3d&risl=&pid=ImgRaw&r=0",
       badge: "TRENDING"
     },
     {

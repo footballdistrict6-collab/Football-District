@@ -1,12 +1,13 @@
 import { create } from 'zustand';
 
-interface CartItem {
-  id: string | number;
-  title: string;
-  price: string;
-  image: string;
-  quantity: number;
-}
+export interface CartItem {
+    id: string;
+    title: string;
+    price: string;
+    image: string;
+    quantity: number;
+    loyalty_points_earned?: number; // <-- أضف هذا السطر هنا
+  }
 
 interface CartStore {
   items: CartItem[];

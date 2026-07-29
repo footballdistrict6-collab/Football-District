@@ -39,7 +39,7 @@ function CatalogContent() {
     fetchProducts();
   }, []);
 
-  // تصفية المنتجات حسب القسم المختـار وأيضاً حسب كلمة البحث إن وجدت
+  // تصفية المنتجات حسب الفئة المختارة وحسب كلمة البحث إن وجدت
   const filteredProducts = products.filter((p) => {
     const matchesCategory = selectedCategory === 'All' || p.category === selectedCategory;
     const matchesSearch = !urlSearch || p.title?.toLowerCase().includes(urlSearch.toLowerCase());
@@ -102,16 +102,23 @@ function CatalogContent() {
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
-            {filteredProducts.map((product) => (
-              <ProductCard
-                key={product.id}
-                id={product.id}
-                title={product.title}
-                price={product.price?.toString() || '0'}
-                category={product.category || 'Jerseys'}
-                imageUrl={Array.isArray(product.image_urls) && product.image_urls.length > 0 ? product.image_urls[0] : 'https://images.unsplash.com/photo-1583318433420-532155e9d9e4?q=80&w=500&auto=format&fit=crop'}
-              />
-            ))}
+            {filteredProducts.map((product) => {
+              const imgUrl = Array.isArray(product.image_urls) && product.image_urls.length > 0 
+                ? product.image_urls[0] 
+                : product.imageUrl || 'https://images.unsplash.com/photo-1583318433420-532155e9d9e4?q=80&w=500&auto=format&fit=crop';
+
+              return (
+                <ProductCard
+                  key={product.id}
+                  id={product.id}
+                  title={product.title}
+                  price={product.price?.toString() || '0'}
+                  category={product.category || 'Jerseys'}
+                  imageUrl={imgUrl}
+                  loyaltyPoints={Number(product.loyalty_points_earned) || 20}
+                />
+              );
+            })}
           </div>
         )}
 

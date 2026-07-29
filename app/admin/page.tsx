@@ -172,13 +172,16 @@ export default function AdminDashboard() {
     if (!editingProduct) return;
 
     const cleanUrls = editForm.imageUrls.filter(url => url.trim() !== '');
+    const ptsValue = parseInt(editForm.loyaltyPoints, 10);
+    const finalPoints = !isNaN(ptsValue) && ptsValue > 0 ? ptsValue : 20;
+
     const { error } = await supabase
       .from('products')
       .update({
         title: editForm.title,
         price: parseFloat(editForm.price),
         category: editForm.category,
-        loyalty_points_earned: parseInt(editForm.loyaltyPoints) || 20,
+        loyalty_points_earned: finalPoints,
         image_urls: cleanUrls.length > 0 ? cleanUrls : ['https://images.unsplash.com/photo-1583318433420-532155e9d9e4?q=80&w=500&auto=format&fit=crop']
       })
       .eq('id', editingProduct.id);
@@ -186,7 +189,7 @@ export default function AdminDashboard() {
     if (error) {
       alert("حدث خطأ أثناء التعديل: " + error.message);
     } else {
-      alert("✅ تم تعديل المنتج والنقاط الممنوحة بنجاح!");
+      alert(`✅ تم تعديل المنتج وحفظ النقاط (${finalPoints} PTS) بنجاح!`);
       setEditingProduct(null);
       fetchProducts();
     }
@@ -269,39 +272,44 @@ export default function AdminDashboard() {
   };
 
   const updateOrderStatus = async (orderId: string, newStatus: string) => {
-    // 1. جلب بيانات الطلب لمعرفة النقاط ورابط الزبون
+    // 1. جلب بيانات الطلب من قاعدة البيانات
     const { data: order } = await supabase
       .from('orders')
       .select('*')
       .eq('id', orderId)
       .single();
 
-    if (newStatus === 'Delivered' && order && !order.points_awarded && order.points_earned > 0 && order.user_id) {
-      // 2. جلب رصيد نقاط الزبون الحالي من جدول profiles
+    // 2. إذا ضغطت على Delivered وكان هناك حساب للزبون ولم يأخذ نقاطه بعد
+    if (newStatus === 'Delivered' && order && !order.points_awarded && order.user_id) {
+      
+      // سحب النقاط المسجلة في الطلب (وإذا كانت فارغة يعطي 20 نقطة كحد أدنى)
+      const pointsToAdd = Number(order.points_earned) || 20;
+
+      // جلب نقاط الزبون الحالية من حسابه
       const { data: profile } = await supabase
         .from('profiles')
         .select('loyalty_points')
         .eq('id', order.user_id)
         .single();
 
-      const currentPoints = profile?.loyalty_points || 0;
-      const newPointsTotal = currentPoints + order.points_earned;
+      const currentPoints = Number(profile?.loyalty_points) || 0;
+      const newPointsTotal = currentPoints + pointsToAdd;
 
-      // 3. إضافة النقاط لرصيد الزبون
+      // إضافة النقاط لحساب الزبون
       await supabase
         .from('profiles')
         .update({ loyalty_points: newPointsTotal })
         .eq('id', order.user_id);
 
-      // 4. تحديث الطلب وتحديد أنه تم منح النقاط حتى لا تُمنح مرتين
+      // تحديث الطلب وتأكيد منح النقاط
       await supabase
         .from('orders')
-        .update({ status: newStatus, points_awarded: true })
+        .update({ status: newStatus, points_awarded: true, points_earned: pointsToAdd })
         .eq('id', orderId);
 
-      alert(`✅ تم تسليم الطلب بنجاح وإضافة ${order.points_earned} نقطة لرصيد الزبون!`);
+      alert(`✅ تم تسليم الطلب وإضافة +${pointsToAdd} نقطة لرصيد الزبون بنجاح!`);
     } else {
-      // تحديث الحالة العادي في حال لم يكن الطلب مربوطاً بحساب أو تم منحه مسبقاً
+      // إذا لم يكن هناك حساب أو تم التسليم مسبقاً، نكتفي بتغيير حالة الطلب فقط
       await supabase
         .from('orders')
         .update({ status: newStatus })
@@ -310,7 +318,7 @@ export default function AdminDashboard() {
 
     fetchOrders();
   };
-  
+
   if (!isAuthenticated) {
     return (
       <div className="bg-[#0a0a0a] min-h-screen flex items-center justify-center p-6 text-white">

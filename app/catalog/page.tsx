@@ -8,12 +8,12 @@ import { useSearchParams } from 'next/navigation';
 function CatalogContent() {
   const searchParams = useSearchParams();
   const urlCategory = searchParams.get('category');
+  const urlSearch = searchParams.get('search');
 
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
 
-  // تحديث الفئة المختارة إذا تم الضغط على زر من النوافذ العلوية (Navbar)
   useEffect(() => {
     if (urlCategory) {
       setSelectedCategory(urlCategory);
@@ -25,7 +25,7 @@ function CatalogContent() {
   useEffect(() => {
     async function fetchProducts() {
       setLoading(true);
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('products')
         .select('*')
         .order('id', { ascending: false });
@@ -39,10 +39,12 @@ function CatalogContent() {
     fetchProducts();
   }, []);
 
-  // تصفية المنتجات حسب الزر المختار
-  const filteredProducts = selectedCategory === 'All'
-    ? products
-    : products.filter((p) => p.category === selectedCategory);
+  // تصفية المنتجات حسب القسم المختـار وأيضاً حسب كلمة البحث إن وجدت
+  const filteredProducts = products.filter((p) => {
+    const matchesCategory = selectedCategory === 'All' || p.category === selectedCategory;
+    const matchesSearch = !urlSearch || p.title?.toLowerCase().includes(urlSearch.toLowerCase());
+    return matchesCategory && matchesSearch;
+  });
 
   const categories = [
     'All',
@@ -60,7 +62,11 @@ function CatalogContent() {
         {/* الترويسة */}
         <div className="mb-10">
           <h1 className="text-4xl md:text-5xl font-extrabold uppercase tracking-tight mb-3">
-            {selectedCategory === 'All' ? '26/27 CATALOG' : selectedCategory.toUpperCase()}
+            {urlSearch 
+              ? `SEARCH RESULTS FOR: "${urlSearch}"` 
+              : selectedCategory === 'All' 
+                ? '26/27 CATALOG' 
+                : selectedCategory.toUpperCase()}
           </h1>
           <p className="text-gray-400">
             Browse the official kits and gear for the season.
@@ -91,20 +97,20 @@ function CatalogContent() {
           </div>
         ) : filteredProducts.length === 0 ? (
           <div className="py-20 text-center bg-[#121212] rounded-2xl border border-[#1f1f1f]">
-            <p className="text-xl font-bold mb-2">No items found in "{selectedCategory}"</p>
-            <p className="text-gray-400">Try selecting another category from above.</p>
+            <p className="text-xl font-bold mb-2">No items found</p>
+            <p className="text-gray-400">Try searching for a different team or selecting another category.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
             {filteredProducts.map((product) => (
-             <ProductCard
-             key={product.id}
-             id={product.id}
-             title={product.title}
-             price={product.price?.toString() || '0'}
-             category={product.category || 'Jerseys'}
-             imageUrl={Array.isArray(product.image_urls) && product.image_urls.length > 0 ? product.image_urls[0] : 'https://images.unsplash.com/photo-1583318433420-532155e9d9e4?q=80&w=500&auto=format&fit=crop'}
-           />
+              <ProductCard
+                key={product.id}
+                id={product.id}
+                title={product.title}
+                price={product.price?.toString() || '0'}
+                category={product.category || 'Jerseys'}
+                imageUrl={Array.isArray(product.image_urls) && product.image_urls.length > 0 ? product.image_urls[0] : 'https://images.unsplash.com/photo-1583318433420-532155e9d9e4?q=80&w=500&auto=format&fit=crop'}
+              />
             ))}
           </div>
         )}

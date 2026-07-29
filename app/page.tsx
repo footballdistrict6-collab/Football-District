@@ -33,27 +33,31 @@ export default function HomePage() {
       title: "26/27 Home Kits",
       subtitle: "Official Player & Fan Versions",
       category: "Home Jerseys",
-      image: "https://images.unsplash.com/photo-1583318433420-532155e9d9e4?q=80&w=800&auto=format&fit=crop",
+      // صورة قميص أساسي كروي جذاب وواضح
+      image: "https://images.unsplash.com/photo-1543351611-58f69d7c1781?q=80&w=800&auto=format&fit=crop",
       badge: "NEW SEASON"
     },
     {
       title: "Away & Third Kits",
       subtitle: "Stand out on the pitch",
       category: "Away Jerseys",
-      image: "https://images.unsplash.com/photo-1511886929837-354d827aae26?q=80&w=800&auto=format&fit=crop",
+      // صورة لاعب بقميص احتياطي مميز على أرض الملعب
+      image: "https://images.unsplash.com/photo-1508098682722-e99c43a406b2?q=80&w=800&auto=format&fit=crop",
       badge: "TRENDING"
     },
     {
       title: "Retro & Classic",
       subtitle: "Timeless football heritage",
       category: "Retro Jerseys",
-      image: "https://images.unsplash.com/photo-1508098682722-e99c43a406b2?q=80&w=800&auto=format&fit=crop",
+      // صورة تعبر عن عراقة وأصالة كرة القدم (ريترو)
+      image: "https://images.unsplash.com/photo-1511886929837-354d827aae26?q=80&w=800&auto=format&fit=crop",
       badge: "ICONIC"
     },
     {
       title: "Pro Equipment",
       subtitle: "Balls, boots & accessories",
       category: "Equipment",
+      // صورة معدات وكرة قدم وحذاء رياضي احترافي
       image: "https://images.unsplash.com/photo-1518091043644-c1d4457512c6?q=80&w=800&auto=format&fit=crop",
       badge: "PERFORMANCE"
     }

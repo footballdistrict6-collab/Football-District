@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Package, ShoppingBag, Plus, RefreshCw, CheckCircle2, Clock, Upload, FileSpreadsheet, Loader2, Trash2 } from 'lucide-react';
+import { Package, ShoppingBag, Plus, RefreshCw, CheckCircle2, Clock, Upload, FileSpreadsheet, Loader2, Trash2, Edit3, X } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 export default function AdminDashboard() {
@@ -13,6 +13,15 @@ export default function AdminDashboard() {
   const [loadingProducts, setLoadingProducts] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importStatus, setImportStatus] = useState<string | null>(null);
+
+  // حالة التعديل (Modal Edit State)
+  const [editingProduct, setEditingProduct] = useState<any | null>(null);
+  const [editForm, setEditForm] = useState({
+    title: '',
+    price: '',
+    category: '',
+    imageUrl: ''
+  });
 
   // حقول إضافة منتج جديد يدوياً
   const [newProduct, setNewProduct] = useState({
@@ -34,7 +43,6 @@ export default function AdminDashboard() {
     setLoading(false);
   };
 
-  // جلب كل المنتجات الموجودة في قاعدة البيانات
   const fetchProducts = async () => {
     setLoadingProducts(true);
     const { data } = await supabase
@@ -73,7 +81,6 @@ export default function AdminDashboard() {
     }
   };
 
-  // وظيفة حذف منتج من الكتالوج
   const handleDeleteProduct = async (id: string | number) => {
     if (!confirm("هل أنت متأكد من حذف هذا المنتج نهائياً؟")) return;
 
@@ -85,7 +92,44 @@ export default function AdminDashboard() {
     }
   };
 
-  // وظيفة استيراد المنتجات من ملف الإكسل
+  // فتح نافذة التعديل وتعبئة البيانات الحالية للمنتج
+  const openEditModal = (product: any) => {
+    setEditingProduct(product);
+    const imgUrl = Array.isArray(product.image_urls) && product.image_urls.length > 0 
+      ? product.image_urls[0] 
+      : '';
+    setEditForm({
+      title: product.title || '',
+      price: product.price?.toString() || '',
+      category: product.category || 'Jerseys',
+      imageUrl: imgUrl
+    });
+  };
+
+  // حفظ التعديلات في قاعدة البيانات
+  const handleUpdateProduct = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingProduct) return;
+
+    const { error } = await supabase
+      .from('products')
+      .update({
+        title: editForm.title,
+        price: parseFloat(editForm.price),
+        category: editForm.category,
+        image_urls: [editForm.imageUrl]
+      })
+      .eq('id', editingProduct.id);
+
+    if (error) {
+      alert("حدث خطأ أثناء التعديل: " + error.message);
+    } else {
+      alert("✅ تم تعديل المنتج بنجاح!");
+      setEditingProduct(null);
+      fetchProducts();
+    }
+  };
+
   const handleExcelUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -137,7 +181,7 @@ export default function AdminDashboard() {
   };
 
   return (
-    <div className="bg-[#0a0a0a] min-h-screen py-12 text-white">
+    <div className="bg-[#0a0a0a] min-h-screen py-12 text-white relative">
       <div className="container mx-auto px-6 max-w-6xl">
         
         {/* الترويسة وأزرار التبديل */}
@@ -250,7 +294,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* القسم الجديد: عرض كل المنتجات مع خيار الحذف */}
+        {/* القسم الثاني: عرض المنتجات مع زري التعديل والحذف */}
         {activeTab === 'products' && (
           <div>
             <div className="flex justify-between items-center mb-6">
@@ -274,7 +318,7 @@ export default function AdminDashboard() {
                     : 'https://images.unsplash.com/photo-1583318433420-532155e9d9e4?q=80&w=500&auto=format&fit=crop';
 
                   return (
-                    <div key={product.id} className="bg-[#121212] p-4 rounded-xl border border-[#1f1f1f] flex items-center justify-between gap-4">
+                    <div key={product.id} className="bg-[#121212] p-4 rounded-xl border border-[#1f1f1f] flex items-center justify-between gap-4 hover:border-[#333] transition">
                       <div className="flex items-center gap-4 min-w-0">
                         <div className="w-16 h-16 bg-[#1a1a1a] rounded-lg overflow-hidden shrink-0 flex items-center justify-center">
                           <img src={imgUrl} alt={product.title} className="w-full h-full object-cover" />
@@ -286,13 +330,23 @@ export default function AdminDashboard() {
                         </div>
                       </div>
 
-                      <button 
-                        onClick={() => handleDeleteProduct(product.id)}
-                        className="text-gray-500 hover:text-red-500 transition p-2 shrink-0"
-                        title="Delete Product"
-                      >
-                        <Trash2 className="w-5 h-5" />
-                      </button>
+                      {/* أزرار التحكم: تعديل (Edit) وحذف (Delete) */}
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button 
+                          onClick={() => openEditModal(product)}
+                          className="text-gray-400 hover:text-[#00AEEF] transition p-2 bg-[#1a1a1a] rounded-lg border border-[#333]"
+                          title="Edit Product"
+                        >
+                          <Edit3 className="w-4 h-4" />
+                        </button>
+                        <button 
+                          onClick={() => handleDeleteProduct(product.id)}
+                          className="text-gray-400 hover:text-red-500 transition p-2 bg-[#1a1a1a] rounded-lg border border-[#333]"
+                          title="Delete Product"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   );
                 })}
@@ -401,6 +455,94 @@ export default function AdminDashboard() {
         )}
 
       </div>
+
+      {/* نافذة التعديل المنبثقة (Edit Modal) */}
+      {editingProduct && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
+          <div className="bg-[#121212] border border-[#333] rounded-2xl p-6 md:p-8 max-w-lg w-full relative shadow-2xl">
+            <button 
+              onClick={() => setEditingProduct(null)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-white bg-[#1a1a1a] p-2 rounded-lg"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <h3 className="text-xl font-bold mb-6 border-b border-[#333] pb-4 flex items-center gap-2">
+              <Edit3 className="text-[#00AEEF] w-5 h-5" /> Edit Product Details
+            </h3>
+
+            <form onSubmit={handleUpdateProduct} className="space-y-4">
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Title</label>
+                <input 
+                  type="text" 
+                  value={editForm.title}
+                  onChange={(e) => setEditForm({...editForm, title: e.target.value})}
+                  className="w-full bg-[#1a1a1a] border border-[#333] rounded p-3 text-white focus:outline-none focus:border-[#00AEEF]"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">Price ($ USD)</label>
+                  <input 
+                    type="number" 
+                    step="0.01" 
+                    value={editForm.price}
+                    onChange={(e) => setEditForm({...editForm, price: e.target.value})}
+                    className="w-full bg-[#1a1a1a] border border-[#333] rounded p-3 text-white focus:outline-none focus:border-[#00AEEF]"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-gray-400 mb-1">Category</label>
+                  <select 
+                    value={editForm.category}
+                    onChange={(e) => setEditForm({...editForm, category: e.target.value})}
+                    className="w-full bg-[#1a1a1a] border border-[#333] rounded p-3 text-white focus:outline-none focus:border-[#00AEEF]"
+                  >
+                    <option value="Home Jerseys">Home Jerseys</option>
+                    <option value="Away Jerseys">Away Jerseys</option>
+                    <option value="Third Jerseys">Third Jerseys</option>
+                    <option value="Retro Jerseys">Retro Jerseys</option>
+                    <option value="Equipment">Equipment</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm text-gray-400 mb-1">Image URL</label>
+                <input 
+                  type="url" 
+                  value={editForm.imageUrl}
+                  onChange={(e) => setEditForm({...editForm, imageUrl: e.target.value})}
+                  className="w-full bg-[#1a1a1a] border border-[#333] rounded p-3 text-white focus:outline-none focus:border-[#00AEEF]"
+                  placeholder="https://..." 
+                  required
+                />
+              </div>
+
+              <div className="flex gap-3 pt-4">
+                <button 
+                  type="button"
+                  onClick={() => setEditingProduct(null)}
+                  className="w-1/2 bg-[#1f1f1f] hover:bg-[#2a2a2a] text-white font-bold py-3 rounded transition"
+                >
+                  Cancel
+                </button>
+                <button 
+                  type="submit"
+                  className="w-1/2 bg-[#00AEEF] hover:bg-blue-500 text-white font-bold py-3 rounded transition shadow-[0_0_15px_rgba(0,174,239,0.3)]"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }

@@ -4,7 +4,17 @@ import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
 import { useCartStore } from '@/store/cart';
 import { useRouter } from 'next/navigation';
-import { Award, ShoppingBag, Truck, CheckCircle2, Clock, Gift, Crown, RefreshCw, LogOut, ArrowRight, ShieldCheck, DollarSign } from 'lucide-react';
+import { 
+  Award, 
+  ShoppingBag, 
+  CheckCircle2, 
+  Clock, 
+  Gift, 
+  Crown, 
+  RefreshCw, 
+  LogOut, 
+  DollarSign 
+} from 'lucide-react';
 import Link from 'next/link';
 
 export default function CustomerProfilePage() {
@@ -14,12 +24,13 @@ export default function CustomerProfilePage() {
   const [loading, setLoading] = useState(true);
   const [redeemedCode, setRedeemedCode] = useState<string | null>(null);
 
-  // سعر صرف النقطة بالدولار (يُسحب تلقائياً من الداشبورد)
+  // سعر صرف النقطة بالدولار (يُسحب تلقائياً من الإعدادات أو يبدأ بـ 0.05 افتراضياً)
   const [pointValueUsd, setPointValueUsd] = useState<number>(0.05);
 
   const { addItem } = useCartStore();
   const router = useRouter();
 
+  // جلب بيانات الحساب ورصيد النقاط وسجل الطلبات
   const fetchCustomerData = async () => {
     setLoading(true);
     const { data: { user } } = await supabase.auth.getUser();
@@ -42,7 +53,7 @@ export default function CustomerProfilePage() {
       setPointValueUsd(Number(storeSettings.loyalty_point_value_usd));
     }
 
-    // 2. جلب حساب الزبون ورصيد النقاط
+    // 2. جلب البروفايل ورصيد النقاط
     const { data: profileData } = await supabase
       .from('profiles')
       .select('*')
@@ -52,6 +63,7 @@ export default function CustomerProfilePage() {
     if (profileData) {
       setProfile(profileData);
     } else {
+      // إنشاء بروفايل أولي إذا كان العميل جديداً
       const defaultProfile = {
         id: user.id,
         full_name: user.user_metadata?.full_name || 'Football District Member',
@@ -62,7 +74,7 @@ export default function CustomerProfilePage() {
       setProfile(defaultProfile);
     }
 
-    // 3. جلب طلبات العميل
+    // 3. جلب طلبات هذا الزبون فقط
     const { data: ordersData } = await supabase
       .from('orders')
       .select('*')
@@ -82,6 +94,7 @@ export default function CustomerProfilePage() {
     router.push('/catalog');
   };
 
+  // إعادة طلب نفس المنتجات السابقة
   const handleReorder = (orderItems: any[]) => {
     if (Array.isArray(orderItems)) {
       orderItems.forEach((item) => {
@@ -98,6 +111,7 @@ export default function CustomerProfilePage() {
     }
   };
 
+  // استبدال النقاط بكود خصم
   const handleRedeemReward = (pointsCost: number, rewardValue: number) => {
     const currentPoints = profile?.loyalty_points || 0;
     if (currentPoints < pointsCost) {
@@ -123,6 +137,7 @@ export default function CustomerProfilePage() {
     return <div className="min-h-screen bg-[#0a0a0a] text-white flex items-center justify-center">Loading loyalty account...</div>;
   }
 
+  // إذا لم يكن الزبون مسجلاً
   if (!user) {
     return (
       <div className="bg-[#0a0a0a] min-h-screen py-20 text-white flex items-center justify-center px-6">
@@ -151,7 +166,9 @@ export default function CustomerProfilePage() {
     );
   }
 
+  // حساب المستوى (Tier)
   const pts = profile?.loyalty_points || 0;
+  
   let tier = { name: "BRONZE MEMBER 🥉", next: 200, color: "from-amber-800 to-amber-950", border: "border-amber-700" };
   if (pts >= 1000) {
     tier = { name: "VIP ICON MEMBER 👑", next: 5000, color: "from-purple-900 to-indigo-950", border: "border-purple-500" };
@@ -161,12 +178,13 @@ export default function CustomerProfilePage() {
     tier = { name: "SILVER MEMBER 🥈", next: 500, color: "from-slate-600 to-slate-800", border: "border-slate-400" };
   }
 
+  // حساب النسبة المئوية للتقدم بدون أخطاء
   const progressPercent = Math.min(100, Math.round((pts / tier.next) * 100));
 
-  // حساب أسعار النقاط المطلوبة للمكافآت بناءً على سعر صرف الدولار الحي
-  // مثلاً: إذا كان pointValueUsd = 0.05 -> قسيمة 5$ تحتاج (5 / 0.05) = 100 نقطة
-  const voucher5Points = Math.max(10, Math.round(5 / pointValueUsd));
-  const voucher15Points = Math.max(30, Math.round(15 / pointValueUsd));
+  // نظام السعر الحر تماماً (بدون أي قيود أو حدود دنيا جنونية)
+  const activeRate = pointValueUsd > 0 ? pointValueUsd : 0.05;
+  const voucher5Points = Math.ceil(5 / activeRate);
+  const voucher15Points = Math.ceil(15 / activeRate);
 
   return (
     <div className="bg-[#0a0a0a] min-h-screen py-12 text-white">
@@ -191,10 +209,10 @@ export default function CustomerProfilePage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           
-          {/* العمود الأيسر: بطاقة الولاء (FUT Card Style) والمكافآت */}
+          {/* العمود الأيسر: بطاقة الولاء والمكافآت */}
           <div className="lg:col-span-5 space-y-6">
             
-            {/* بطاقة الولاء */}
+            {/* بطاقة الولاء الرقمية */}
             <div className={`bg-gradient-to-br ${tier.color} p-6 rounded-2xl border ${tier.border} shadow-2xl relative overflow-hidden`}>
               <div className="absolute -right-6 -bottom-6 opacity-10">
                 <Crown className="w-48 h-48 text-white" />
@@ -226,14 +244,17 @@ export default function CustomerProfilePage() {
               </div>
             </div>
 
-            {/* عرض قيمة صرف النقطة التفاعلي للمستخدم */}
+            {/* عرض قيمة صرف النقطة الحرة كما أدخلتها أنت بالضبط في الداشبورد */}
             <div className="p-3.5 bg-[#121212] border border-[#1f1f1f] rounded-xl flex items-center justify-between text-xs text-gray-300">
               <span className="flex items-center gap-1.5 font-semibold">
                 <DollarSign className="w-4 h-4 text-amber-400" /> Current Exchange Rate:
               </span>
-              <span className="font-bold text-amber-400">1 PT = ${pointValueUsd.toFixed(3)} USD</span>
+              <span className="font-bold text-amber-400">
+                1 PT = ${activeRate} USD
+              </span>
             </div>
 
+            {/* عرض كود الخصم المستبدل إن وجد */}
             {redeemedCode && (
               <div className="bg-green-950/40 border border-green-500 rounded-xl p-4 text-center">
                 <p className="text-xs text-green-300 font-bold uppercase mb-1">Active Discount Code</p>
@@ -242,14 +263,13 @@ export default function CustomerProfilePage() {
               </div>
             )}
 
-            {/* متجر مكافآت النقاط الديناميكي */}
+            {/* متجر مكافآت النقاط (تتغير أرقامه حرياً مع سعر الصرف) */}
             <div className="bg-[#121212] p-6 rounded-2xl border border-[#1f1f1f] space-y-4">
               <h3 className="font-bold text-lg border-b border-[#222] pb-3 flex items-center gap-2">
                 <Gift className="w-5 h-5 text-amber-400" /> Redeem Rewards
               </h3>
 
               <div className="space-y-3">
-                {/* مكافأة $5 */}
                 <div className="flex items-center justify-between p-3.5 bg-[#1a1a1a] rounded-xl border border-[#262626]">
                   <div>
                     <p className="font-bold text-sm">$5.00 Off Voucher</p>
@@ -263,7 +283,6 @@ export default function CustomerProfilePage() {
                   </button>
                 </div>
 
-                {/* مكافأة $15 */}
                 <div className="flex items-center justify-between p-3.5 bg-[#1a1a1a] rounded-xl border border-[#262626]">
                   <div>
                     <p className="font-bold text-sm">$15.00 Off Voucher</p>

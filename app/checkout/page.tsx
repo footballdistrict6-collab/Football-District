@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { useCartStore } from '@/store/cart';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
-import { ShieldCheck, Truck, ArrowLeft, Award, CheckCircle2 } from 'lucide-react';
+import { ShieldCheck, Truck, ArrowLeft, Award, CheckCircle2, Tag, X } from 'lucide-react';
 import Link from 'next/link';
 
 export default function CheckoutPage() {
@@ -16,6 +16,12 @@ export default function CheckoutPage() {
   const [isSuccess, setIsSuccess] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [confirmedPoints, setConfirmedPoints] = useState<number>(0);
+
+  // نظام الفاوشر وكود الخصم
+  const [voucherCode, setVoucherCode] = useState('');
+  const [discountAmount, setDiscountAmount] = useState<number>(0);
+  const [appliedVoucher, setAppliedVoucher] = useState<string | null>(null);
+  const [voucherError, setVoucherError] = useState<string | null>(null);
 
   const [form, setForm] = useState({
     firstName: '',
@@ -38,13 +44,41 @@ export default function CheckoutPage() {
 
   const subtotal = items.reduce((sum, item) => sum + (parseFloat(item.price) * item.quantity), 0);
   const shipping = 5.00;
-  const total = subtotal + shipping;
+  // الفاتورة النهائية بعد تطبيق الخصم (بحيث لا تقل عن صفر)
+  const total = Math.max(0, subtotal + shipping - discountAmount);
 
-  // حساب دقيق وإجباري للنقاط لكل عنصر في السلة
   const totalPointsEarned = items.reduce((sum, item: any) => {
     const itemPts = Number(item.loyalty_points_earned) > 0 ? Number(item.loyalty_points_earned) : 20;
     return sum + (itemPts * (Number(item.quantity) || 1));
   }, 0);
+
+  // وظيفة تطبيق كود الخصم المستبدل
+  const handleApplyVoucher = (e: React.FormEvent) => {
+    e.preventDefault();
+    setVoucherError(null);
+
+    const cleanCode = voucherCode.trim().toUpperCase();
+    if (!cleanCode) return;
+
+    // قراءة قيمة الخصم تلقائياً من اسم الكود (مثلاً FD-5OFF أو FD-15OFF)
+    if (cleanCode.startsWith('FD-5OFF')) {
+      setDiscountAmount(5);
+      setAppliedVoucher(cleanCode);
+      setVoucherCode('');
+    } else if (cleanCode.startsWith('FD-15OFF')) {
+      setDiscountAmount(15);
+      setAppliedVoucher(cleanCode);
+      setVoucherCode('');
+    } else {
+      setVoucherError('Invalid or expired discount code');
+    }
+  };
+
+  const handleRemoveVoucher = () => {
+    setDiscountAmount(0);
+    setAppliedVoucher(null);
+    setVoucherError(null);
+  };
 
   const handleSubmitOrder = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,7 +95,7 @@ export default function CheckoutPage() {
         last_name: form.lastName,
         phone: form.phone,
         address: form.address,
-        notes: form.notes,
+        notes: `${form.notes} ${appliedVoucher ? `[Voucher Used: ${appliedVoucher} - Discount: $${discountAmount}]` : ''}`.trim(),
         items: items,
         total_amount: total.toFixed(2),
         points_earned: finalPointsToAward,
@@ -180,6 +214,7 @@ export default function CheckoutPage() {
             </button>
           </form>
 
+          {/* ملخص الطلب + مربع إدخال الكود */}
           <div className="lg:col-span-5">
             <div className="bg-[#121212] p-6 md:p-8 rounded-xl border border-[#1f1f1f] sticky top-24 space-y-6">
               <h3 className="text-xl font-bold border-b border-[#333] pb-4">Order Summary</h3>
@@ -199,6 +234,53 @@ export default function CheckoutPage() {
                 ))}
               </div>
 
+              {/* مربع إدخال كود الفاوشر (Redeemed Discount Code) */}
+              <div className="border-t border-[#333] pt-4">
+                <label className="block text-xs font-bold uppercase text-gray-400 mb-2 flex items-center gap-1.5">
+                  <Tag className="w-4 h-4 text-[#00AEEF]" /> Have a Loyalty Voucher?
+                </label>
+
+                {appliedVoucher ? (
+                  <div className="p-3 bg-green-950/40 border border-green-500/50 rounded-xl flex items-center justify-between text-green-400">
+                    <div className="text-xs font-bold">
+                      <span>Code: </span>
+                      <span className="font-mono">{appliedVoucher}</span>
+                      <span className="block text-green-300">-$ {discountAmount.toFixed(2)} Off</span>
+                    </div>
+                    <button 
+                      type="button"
+                      onClick={handleRemoveVoucher}
+                      className="p-1.5 hover:bg-red-900/40 text-gray-400 hover:text-red-400 rounded-lg transition"
+                      title="Remove Voucher"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={voucherCode}
+                      onChange={(e) => setVoucherCode(e.target.value)}
+                      placeholder="e.g. FD-5OFF-JS86"
+                      className="flex-1 bg-[#1a1a1a] border border-[#333] rounded-lg p-3 text-sm text-white font-mono uppercase focus:outline-none focus:border-[#00AEEF]"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleApplyVoucher}
+                      className="bg-[#1a1a1a] hover:bg-[#00AEEF] text-white text-xs font-extrabold px-4 rounded-lg border border-[#333] hover:border-[#00AEEF] transition"
+                    >
+                      Apply
+                    </button>
+                  </div>
+                )}
+
+                {voucherError && (
+                  <p className="text-xs text-red-500 font-bold mt-1.5">{voucherError}</p>
+                )}
+              </div>
+
+              {/* بانر النقاط الذهبي */}
               <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between text-amber-400">
                 <div className="flex items-center gap-2 font-bold text-sm">
                   <Award className="w-5 h-5" />
@@ -216,6 +298,12 @@ export default function CheckoutPage() {
                   <span>Shipping (Lebanon)</span>
                   <span>${shipping.toFixed(2)}</span>
                 </div>
+                {discountAmount > 0 && (
+                  <div className="flex justify-between text-green-400 font-bold">
+                    <span>Voucher Discount</span>
+                    <span>-$ {discountAmount.toFixed(2)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-xl font-black text-white pt-2 border-t border-[#333]">
                   <span>Total</span>
                   <span className="text-[#00AEEF]">${total.toFixed(2)}</span>

@@ -2,13 +2,15 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
-import { Package, ShoppingBag, Plus, RefreshCw, CheckCircle2, Clock, Upload, FileSpreadsheet, Loader2 } from 'lucide-react';
+import { Package, ShoppingBag, Plus, RefreshCw, CheckCircle2, Clock, Upload, FileSpreadsheet, Loader2, Trash2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 export default function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState<'orders' | 'add_product' | 'import_excel'>('orders');
+  const [activeTab, setActiveTab] = useState<'orders' | 'products' | 'add_product' | 'import_excel'>('orders');
   const [orders, setOrders] = useState<any[]>([]);
+  const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingProducts, setLoadingProducts] = useState(false);
   const [importing, setImporting] = useState(false);
   const [importStatus, setImportStatus] = useState<string | null>(null);
 
@@ -32,8 +34,21 @@ export default function AdminDashboard() {
     setLoading(false);
   };
 
+  // جلب كل المنتجات الموجودة في قاعدة البيانات
+  const fetchProducts = async () => {
+    setLoadingProducts(true);
+    const { data } = await supabase
+      .from('products')
+      .select('*')
+      .order('id', { ascending: false });
+    
+    if (data) setProducts(data);
+    setLoadingProducts(false);
+  };
+
   useEffect(() => {
     fetchOrders();
+    fetchProducts();
   }, []);
 
   const handleAddProduct = async (e: React.FormEvent) => {
@@ -54,6 +69,19 @@ export default function AdminDashboard() {
     } else {
       alert("تمت إضافة المنتج بنجاح إلى الكتالوج! ✅");
       setNewProduct({ title: '', price: '', category: 'Jerseys', season: '2026-2027', imageUrl: '' });
+      fetchProducts();
+    }
+  };
+
+  // وظيفة حذف منتج من الكتالوج
+  const handleDeleteProduct = async (id: string | number) => {
+    if (!confirm("هل أنت متأكد من حذف هذا المنتج نهائياً؟")) return;
+
+    const { error } = await supabase.from('products').delete().eq('id', id);
+    if (error) {
+      alert("حدث خطأ أثناء الحذف: " + error.message);
+    } else {
+      setProducts(products.filter((p) => p.id !== id));
     }
   };
 
@@ -73,32 +101,25 @@ export default function AdminDashboard() {
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
         
-        // تحويل الجدول إلى قائمة Object
         const jsonData: any[] = XLSX.utils.sheet_to_json(worksheet);
-
         setImportStatus(`تم العثور على ${jsonData.length} منتج، جاري إدخالها في قاعدة البيانات...`);
 
-        // تجهيز المنتجات لـ Supabase بناءً على أسماء الأعمدة في ملف الإكسل الخاص بك
         const formattedProducts = jsonData.map((row) => ({
           title: row['Name'] || row['title'] || 'Unnamed Product',
           price: parseFloat(row['Regular Price'] || row['price'] || 0),
           category: row['Category'] || 'Jerseys',
           season: '2026-2027',
           description: row['Description'] || '',
-          // نضع الصورة داخل مصفوفة ARRAY لتجنب خطأ Array في Supabase
           image_urls: row['Image URL'] ? [row['Image URL']] : ['https://images.unsplash.com/photo-1583318433420-532155e9d9e4?q=80&w=500&auto=format&fit=crop'],
           is_retro: false
         }));
 
-        // إدخال كل المنتجات دفعة واحدة إلى جدول products
         const { error } = await supabase.from('products').insert(formattedProducts);
-
-        if (error) {
-          throw error;
-        }
+        if (error) throw error;
 
         alert(`✅ تم استيراد ${formattedProducts.length} منتجاً بنجاح من ملف الإكسل!`);
         setImportStatus("تم الاستيراد بنجاح! يمكنك مراجعة الكتالوج الآن.");
+        fetchProducts();
       } catch (error: any) {
         alert("🚨 حدث خطأ أثناء الاستيراد: " + error.message);
         setImportStatus("فشل الاستيراد.");
@@ -134,6 +155,12 @@ export default function AdminDashboard() {
               className={`px-5 py-3 rounded-lg font-bold flex items-center gap-2 transition ${activeTab === 'orders' ? 'bg-[#00AEEF] text-white' : 'bg-[#121212] text-gray-400 hover:text-white'}`}
             >
               <ShoppingBag className="w-5 h-5" /> Orders ({orders.length})
+            </button>
+            <button 
+              onClick={() => setActiveTab('products')}
+              className={`px-5 py-3 rounded-lg font-bold flex items-center gap-2 transition ${activeTab === 'products' ? 'bg-[#00AEEF] text-white' : 'bg-[#121212] text-gray-400 hover:text-white'}`}
+            >
+              <Package className="w-5 h-5" /> Products ({products.length})
             </button>
             <button 
               onClick={() => setActiveTab('add_product')}
@@ -223,7 +250,58 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* القسم الثاني: إضافة منتج يدوياً */}
+        {/* القسم الجديد: عرض كل المنتجات مع خيار الحذف */}
+        {activeTab === 'products' && (
+          <div>
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-bold">All Store Products ({products.length})</h2>
+              <button onClick={fetchProducts} className="flex items-center gap-2 text-sm text-[#00AEEF] hover:underline">
+                <RefreshCw className="w-4 h-4" /> Refresh List
+              </button>
+            </div>
+
+            {loadingProducts ? (
+              <p className="text-gray-400">Loading catalog items...</p>
+            ) : products.length === 0 ? (
+              <div className="bg-[#121212] p-12 text-center rounded-xl border border-[#1f1f1f]">
+                <p className="text-gray-400">No products found in the catalog.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {products.map((product) => {
+                  const imgUrl = Array.isArray(product.image_urls) && product.image_urls.length > 0 
+                    ? product.image_urls[0] 
+                    : 'https://images.unsplash.com/photo-1583318433420-532155e9d9e4?q=80&w=500&auto=format&fit=crop';
+
+                  return (
+                    <div key={product.id} className="bg-[#121212] p-4 rounded-xl border border-[#1f1f1f] flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-4 min-w-0">
+                        <div className="w-16 h-16 bg-[#1a1a1a] rounded-lg overflow-hidden shrink-0 flex items-center justify-center">
+                          <img src={imgUrl} alt={product.title} className="w-full h-full object-cover" />
+                        </div>
+                        <div className="min-w-0">
+                          <h4 className="font-bold text-sm truncate" title={product.title}>{product.title}</h4>
+                          <p className="text-[#00AEEF] font-semibold text-sm mt-1">${product.price}</p>
+                          <span className="text-[10px] bg-[#1a1a1a] text-gray-400 px-2 py-0.5 rounded uppercase">{product.category}</span>
+                        </div>
+                      </div>
+
+                      <button 
+                        onClick={() => handleDeleteProduct(product.id)}
+                        className="text-gray-500 hover:text-red-500 transition p-2 shrink-0"
+                        title="Delete Product"
+                      >
+                        <Trash2 className="w-5 h-5" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* القسم الثالث: إضافة منتج يدوياً */}
         {activeTab === 'add_product' && (
           <div className="max-w-2xl mx-auto bg-[#121212] p-8 rounded-xl border border-[#1f1f1f]">
             <h2 className="text-2xl font-bold mb-6 border-b border-[#333] pb-4">Add Single Product</h2>
@@ -281,7 +359,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* القسم الثالث الجديد: استيراد ملف الإكسل مباشرة */}
+        {/* القسم الرابع: استيراد ملف الإكسل */}
         {activeTab === 'import_excel' && (
           <div className="max-w-2xl mx-auto bg-[#121212] p-8 rounded-xl border border-[#1f1f1f] text-center">
             <FileSpreadsheet className="w-16 h-16 text-green-500 mx-auto mb-4" />

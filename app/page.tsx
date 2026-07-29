@@ -10,11 +10,10 @@ export default function HomePage() {
   const [featuredProducts, setFeaturedProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // جلب أحدث 8 منتجات من قاعدة بيانات Supabase لعرضها في الرئيسية
   useEffect(() => {
     async function fetchFeaturedProducts() {
       setLoading(true);
-      const { data, error } = await supabase
+      const { data } = await supabase
         .from('products')
         .select('*')
         .order('id', { ascending: false })
@@ -29,7 +28,6 @@ export default function HomePage() {
     fetchFeaturedProducts();
   }, []);
 
-  // فئات التصفح السريع التفاعلية
   const quickCategories = [
     {
       title: "26/27 Home Kits",
@@ -64,9 +62,8 @@ export default function HomePage() {
   return (
     <div className="bg-[#0a0a0a] min-h-screen text-white">
       
-      {/* 1. HERO SECTION - الترويسة الرئيسية الفخمة */}
+      {/* HERO SECTION */}
       <section className="relative min-h-[85vh] flex items-center justify-center overflow-hidden border-b border-[#1f1f1f]">
-        {/* خلفية ديناميكية */}
         <div 
           className="absolute inset-0 opacity-25 bg-cover bg-center"
           style={{ backgroundImage: `url('https://images.unsplash.com/photo-1508098682722-e99c43a406b2?q=80&w=1920&auto=format&fit=crop')` }}
@@ -108,7 +105,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 2. WHY US - شريط الموثوقية والشحن */}
+      {/* WHY US */}
       <section className="border-b border-[#1f1f1f] bg-[#101010]">
         <div className="container mx-auto px-6 py-8">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 text-center md:text-left">
@@ -139,7 +136,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 3. SHOP BY CATEGORY - أقسام تسوق حقيقية وتفاعلية */}
+      {/* SHOP BY CATEGORY */}
       <section className="py-20 container mx-auto px-6 border-b border-[#1f1f1f]">
         <div className="flex flex-col md:flex-row md:items-end justify-between mb-12">
           <div>
@@ -188,7 +185,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 4. NEW ARRIVALS & FEATURED - المنتجات الحقيقية المسحوبة من قاعدة البيانات */}
+      {/* NEW ARRIVALS & FEATURED */}
       <section className="py-20 container mx-auto px-6">
         <div className="flex flex-col md:flex-row md:items-end justify-between mb-12">
           <div>
@@ -218,7 +215,7 @@ export default function HomePage() {
             </Link>
           </div>
         ) : (
-<div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
             {featuredProducts.map((product) => {
               const imgUrl = Array.isArray(product.image_urls) && product.image_urls.length > 0 
                 ? product.image_urls[0] 
@@ -232,15 +229,14 @@ export default function HomePage() {
                   price={product.price?.toString() || '0'}
                   category={product.category || 'Jerseys'}
                   imageUrl={imgUrl}
-                  // تمرير النقاط الحقيقية من قاعدة البيانات إلى بطاقة المنتج في الصفحة الرئيسية
-                  loyaltyPoints={Number(product.loyalty_points_earned) || 20}
+                  // تمرير النقاط الحقيقية لتتطابق تماماً مع الكتالوج
+                  loyaltyPoints={Number(product.loyalty_points_earned) > 0 ? Number(product.loyalty_points_earned) : 20}
                 />
               );
             })}
           </div>
         )}
 
-        {/* زر سفلي كبير للانتقال إلى الكتالوج */}
         <div className="text-center mt-16">
           <Link 
             href="/catalog" 

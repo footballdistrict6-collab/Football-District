@@ -15,6 +15,7 @@ export default function CheckoutPage() {
   const [loading, setLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
+  const [confirmedPoints, setConfirmedPoints] = useState<number>(0);
 
   const [form, setForm] = useState({
     firstName: '',
@@ -26,7 +27,6 @@ export default function CheckoutPage() {
 
   useEffect(() => {
     setMounted(true);
-    // التحقق مما إذا كان الزبون مسجل الدخول لربط الطلب بحسابه
     async function checkUser() {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) setUserId(user.id);
@@ -37,21 +37,22 @@ export default function CheckoutPage() {
   if (!mounted) return null;
 
   const subtotal = items.reduce((sum, item) => sum + (parseFloat(item.price) * item.quantity), 0);
-  const shipping = 5.00; // تكلفة التوصيل في لبنان 5$
+  const shipping = 5.00;
   const total = subtotal + shipping;
 
-  // حساب إجمالي نقاط الولاء المكتسبة من هذه السلة (الافتراضي 20 نقطة للقطعة إن لم تحدد)
-// حساب إجمالي نقاط الولاء المكتسبة بناءً على القيم الفعلية المحفوظة في السلة
-const totalPointsEarned = items.reduce((sum, item: any) => {
-    const pts = Number(item.loyalty_points_earned) || 20;
-    return sum + (pts * (Number(item.quantity) || 1));
+  // حساب دقيق وإجباري للنقاط لكل عنصر في السلة
+  const totalPointsEarned = items.reduce((sum, item: any) => {
+    const itemPts = Number(item.loyalty_points_earned) > 0 ? Number(item.loyalty_points_earned) : 20;
+    return sum + (itemPts * (Number(item.quantity) || 1));
   }, 0);
-  
+
   const handleSubmitOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (items.length === 0) return;
 
     setLoading(true);
+    const finalPointsToAward = totalPointsEarned;
+    setConfirmedPoints(finalPointsToAward);
 
     const { error } = await supabase.from('orders').insert([
       {
@@ -63,7 +64,7 @@ const totalPointsEarned = items.reduce((sum, item: any) => {
         notes: form.notes,
         items: items,
         total_amount: total.toFixed(2),
-        points_earned: totalPointsEarned,
+        points_earned: finalPointsToAward,
         points_awarded: false,
         status: 'Pending'
       }
@@ -90,7 +91,7 @@ const totalPointsEarned = items.reduce((sum, item: any) => {
           </p>
           <div className="bg-[#1a1a1a] p-4 rounded-xl border border-[#333] mb-8 inline-flex items-center gap-2 text-amber-400 font-bold">
             <Award className="w-5 h-5" />
-            <span>+{totalPointsEarned} Loyalty Points will be awarded upon delivery!</span>
+            <span>+{confirmedPoints} Loyalty Points will be awarded upon delivery!</span>
           </div>
           <Link
             href="/catalog"
@@ -115,7 +116,6 @@ const totalPointsEarned = items.reduce((sum, item: any) => {
         </h1>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
-          {/* نموذج بيانات التوصيل */}
           <form onSubmit={handleSubmitOrder} className="lg:col-span-7 space-y-6">
             <div className="bg-[#121212] p-6 md:p-8 rounded-xl border border-[#1f1f1f] space-y-6">
               <h3 className="text-xl font-bold border-b border-[#333] pb-4">Delivery Information (Lebanon)</h3>
@@ -180,7 +180,6 @@ const totalPointsEarned = items.reduce((sum, item: any) => {
             </button>
           </form>
 
-          {/* ملخص السلة والنقاط المكتسبة */}
           <div className="lg:col-span-5">
             <div className="bg-[#121212] p-6 md:p-8 rounded-xl border border-[#1f1f1f] sticky top-24 space-y-6">
               <h3 className="text-xl font-bold border-b border-[#333] pb-4">Order Summary</h3>
@@ -200,7 +199,6 @@ const totalPointsEarned = items.reduce((sum, item: any) => {
                 ))}
               </div>
 
-              {/* بانر النقاط الذهبي */}
               <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between text-amber-400">
                 <div className="flex items-center gap-2 font-bold text-sm">
                   <Award className="w-5 h-5" />

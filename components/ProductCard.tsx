@@ -27,17 +27,19 @@ export default function ProductCard({
     e.preventDefault(); 
     e.stopPropagation();
 
+    // نضمن تحويل القيمة لرقم صحيح، وإذا كان غير موجود أو صفر نعوضه بـ 20
+    const finalPoints = Number(loyaltyPoints) > 0 ? Number(loyaltyPoints) : 20;
+
     addItem({
       id: `${id}-L`,
       title: title,
       price: price.toString(),
       image: imageUrl || 'https://images.unsplash.com/photo-1583318433420-532155e9d9e4?q=80&w=500&auto=format&fit=crop',
       quantity: 1,
-      // السطر الحاسم: حفظ النقاط المخصصة (مثل 1000) مع العنصر في السلة
-      loyalty_points_earned: Number(loyaltyPoints) || 20
+      loyalty_points_earned: finalPoints
     });
 
-    alert(`✅ Added to cart (+${loyaltyPoints} PTS)`);
+    alert(`✅ Added to cart (+${finalPoints} PTS)`);
   };
 
   return (
@@ -51,7 +53,7 @@ export default function ProductCard({
             className="object-cover h-full w-full group-hover:scale-105 transition duration-500 opacity-80 group-hover:opacity-100" 
           />
           <span className="absolute bottom-2 right-2 bg-black/80 text-amber-400 border border-amber-500/30 text-[10px] font-bold px-2 py-1 rounded flex items-center gap-1">
-            <Award className="w-3 h-3" /> +{loyaltyPoints} PTS
+            <Award className="w-3 h-3" /> +{Number(loyaltyPoints) > 0 ? Number(loyaltyPoints) : 20} PTS
           </span>
         </div>
 

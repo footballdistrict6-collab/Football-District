@@ -272,47 +272,58 @@ export default function AdminDashboard() {
   };
 
   const updateOrderStatus = async (orderId: string, newStatus: string) => {
-    // 1. جلب بيانات الطلب من قاعدة البيانات
+    // 1. جلب الطلب
     const { data: order } = await supabase
       .from('orders')
       .select('*')
       .eq('id', orderId)
       .single();
 
-    // 2. عند تحويل الطلب إلى Delivered وكان مربوطاً بحساب زبون
     if (newStatus === 'Delivered' && order && order.user_id && !order.points_awarded) {
-      
       const pointsToAdd = Number(order.points_earned) > 0 ? Number(order.points_earned) : 20;
 
-      // جلب رصيد الزبون الحالي
+      // 2. فحص هل الزبون لديه حساب في جدول profiles
       const { data: profile } = await supabase
         .from('profiles')
         .select('loyalty_points')
         .eq('id', order.user_id)
         .single();
 
-      const currentPoints = Number(profile?.loyalty_points) || 0;
+      let currentPoints = 0;
+
+      if (profile) {
+        currentPoints = Number(profile.loyalty_points) || 0;
+      } else {
+        // إذا كان الحساب مفقوداً في profiles، ننشئه فوراً لنضمن عدم ضياع النقاط
+        await supabase.from('profiles').insert([
+          {
+            id: order.user_id,
+            full_name: `${order.first_name || ''} ${order.last_name || ''}`.trim() || 'Customer',
+            loyalty_points: 0,
+            role: 'customer'
+          }
+        ]);
+      }
+
       const newPointsTotal = currentPoints + pointsToAdd;
 
-      // إضافة النقاط لرصيد حساب الزبون
-      const { error: profileError } = await supabase
+      // 3. صب النقاط في حساب الزبون
+      const { error: updateError } = await supabase
         .from('profiles')
         .update({ loyalty_points: newPointsTotal })
         .eq('id', order.user_id);
 
-      if (!profileError) {
-        // تحديث حالة الطلب وتأكيد أن النقاط صُبّت بنجاح
+      if (!updateError) {
         await supabase
           .from('orders')
           .update({ status: newStatus, points_awarded: true, points_earned: pointsToAdd })
           .eq('id', orderId);
 
-        alert(`✅ تم تسليم الطلب وإضافة +${pointsToAdd} PTS بنجاح! الرصيد الجديد للزبون: ${newPointsTotal} PTS`);
+        alert(`✅ تم تسليم الطلب وإضافة +${pointsToAdd} نقطة! رصيد الزبون الجديد الآن: ${newPointsTotal} PTS`);
       } else {
-        alert("🚨 حدث خطأ أثناء تحديث رصيد الزبون: " + profileError.message);
+        alert("🚨 حدث خطأ في تحديث النقاط: " + updateError.message);
       }
     } else {
-      // تحديث الحالة العادي للطلبات غير المربوطة بحساب أو التي تم منح نقاطها مسبقاً
       await supabase
         .from('orders')
         .update({ status: newStatus })

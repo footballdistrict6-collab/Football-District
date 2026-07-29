@@ -114,7 +114,6 @@ export default function CustomerProfilePage() {
     return <div className="min-h-screen bg-[#0a0a0a] text-white flex items-center justify-center">Loading loyalty account...</div>;
   }
 
-  // إذا لم يكن الزبون مسجلاً، يُعرض له خيار الدخول أو الإنشاء بحساب سريع
   if (!user) {
     return (
       <div className="bg-[#0a0a0a] min-h-screen py-20 text-white flex items-center justify-center px-6">
@@ -122,18 +121,21 @@ export default function CustomerProfilePage() {
           <Award className="w-16 h-16 text-[#00AEEF] mx-auto mb-6" />
           <h2 className="text-3xl font-black uppercase mb-2">Join FD Loyalty Club</h2>
           <p className="text-gray-400 text-sm mb-8">
-            Create an account to earn points on every jersey purchase, unlock cash discounts, and track your Lebanon orders.
+            Create an account or sign in to earn points on every jersey purchase, unlock cash discounts, and track your Lebanon orders.
           </p>
           <div className="space-y-3">
             <Link 
-              href="/catalog" 
+              href="/login" 
               className="w-full bg-[#00AEEF] hover:bg-blue-500 text-white font-extrabold py-4 rounded-xl block transition shadow-[0_0_15px_rgba(0,174,239,0.3)]"
+            >
+              Sign In / Create Account
+            </Link>
+            <Link 
+              href="/catalog" 
+              className="w-full bg-[#1a1a1a] hover:bg-[#222] text-gray-300 font-bold py-3 rounded-xl block transition text-sm border border-[#333]"
             >
               Browse Catalog First
             </Link>
-            <p className="text-xs text-gray-500 mt-4">
-              💡 Your points are automatically earned on every checkout!
-            </p>
           </div>
         </div>
       </div>

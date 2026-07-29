@@ -1,6 +1,5 @@
 import { create } from 'zustand';
 
-// تحديد شكل المنتج داخل السلة
 interface CartItem {
   id: string | number;
   title: string;
@@ -9,19 +8,17 @@ interface CartItem {
   quantity: number;
 }
 
-// تحديد وظائف السلة
 interface CartStore {
   items: CartItem[];
   addItem: (item: CartItem) => void;
   cartCount: () => number;
+  clearCart: () => void;
 }
 
 export const useCartStore = create<CartStore>((set, get) => ({
   items: [],
   
-  // وظيفة إضافة منتج للسلة
   addItem: (item) => set((state) => {
-    // التحقق مما إذا كان المنتج موجوداً مسبقاً لزيادة الكمية فقط
     const existingItem = state.items.find((i) => i.id === item.id);
     if (existingItem) {
       return { 
@@ -30,10 +27,11 @@ export const useCartStore = create<CartStore>((set, get) => ({
         ) 
       };
     }
-    // إذا كان منتجاً جديداً، أضفه للسلة
     return { items: [...state.items, { ...item, quantity: 1 }] };
   }),
 
-  // وظيفة حساب إجمالي عدد القطع في السلة
   cartCount: () => get().items.reduce((total, item) => total + item.quantity, 0),
+
+  // وظيفة تفريغ السلة
+  clearCart: () => set({ items: [] }),
 }));

@@ -302,7 +302,7 @@ const handleApplyVoucher = (e: React.FormEvent) => {
                       type="text"
                       value={voucherCode}
                       onChange={(e) => setVoucherCode(e.target.value)}
-                      placeholder="e.g. FD-5OFF-JS86"
+                      placeholder=""
                       className="flex-1 bg-[#1a1a1a] border border-[#333] rounded-lg p-3 text-sm text-white font-mono uppercase focus:outline-none focus:border-[#00AEEF]"
                     />
                     <button

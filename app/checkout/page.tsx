@@ -43,7 +43,7 @@ export default function CheckoutPage() {
   if (!mounted) return null;
 
   const subtotal = items.reduce((sum, item) => sum + (parseFloat(item.price) * item.quantity), 0);
-  const shipping = 5.00;
+  const shipping = 4.00;
   // الفاتورة النهائية بعد تطبيق الخصم (بحيث لا تقل عن صفر)
   const total = Math.max(0, subtotal + shipping - discountAmount);
 
@@ -160,7 +160,7 @@ export default function CheckoutPage() {
                   <input
                     type="text" required value={form.firstName}
                     onChange={(e) => setForm({...form, firstName: e.target.value})}
-                    placeholder="Hussein"
+                    placeholder="Name"
                     className="w-full bg-[#1a1a1a] border border-[#333] rounded-lg p-3.5 text-white focus:outline-none focus:border-[#00AEEF]"
                   />
                 </div>
@@ -169,7 +169,7 @@ export default function CheckoutPage() {
                   <input
                     type="text" required value={form.lastName}
                     onChange={(e) => setForm({...form, lastName: e.target.value})}
-                    placeholder="Cherry"
+                    placeholder="Family Name"
                     className="w-full bg-[#1a1a1a] border border-[#333] rounded-lg p-3.5 text-white focus:outline-none focus:border-[#00AEEF]"
                   />
                 </div>

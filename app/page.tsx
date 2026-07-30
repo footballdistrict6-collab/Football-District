@@ -30,39 +30,34 @@ export default function HomePage() {
 
   const quickCategories = [
     {
-      title: "26/27 Home Kits",
-      subtitle: "Official Player & Fan Versions",
-      category: "Home Jerseys",
-      // صورة قميص أساسي كروي جذاب وواضح
+      title: "26/27 Kits",
+      subtitle: "Official Regular Season Kits",
+      category: "Kits",
       image: "https://images.unsplash.com/photo-1543351611-58f69d7c1781?q=80&w=800&auto=format&fit=crop",
       badge: "NEW SEASON"
     },
     {
-      title: "Away & Third Kits",
-      subtitle: "Stand out on the pitch",
-      category: "Away Jerseys",
-      // صورة لاعب بقميص احتياطي مميز على أرض الملعب
-      image: "https://th.bing.com/th/id/R.afc2c4c14920f784173c605ec15e32a6?rik=61XwzN4xXSQEYQ&riu=http%3a%2f%2fwww.ultrafootball.com%2fcdn%2fshop%2farticles%2fAdidas_World_Cup_2026_Away_Jerseys_Bring_Culture_Front_and_Centre.jpg%3fv%3d1773979677&ehk=5qeHF6dE%2fmAarPOFJK1m2DNzEGb5ENP1DxWtB0Hbu0Q%3d&risl=&pid=ImgRaw&r=0",
-      badge: "TRENDING"
-    },
-    {
-      title: "Retro & Classic",
+      title: "Retro Kits",
       subtitle: "Timeless football heritage",
-      category: "Retro Jerseys",
-      // صورة تعبر عن عراقة وأصالة كرة القدم (ريترو)
+      category: "Retro Kits",
       image: "https://images.unsplash.com/photo-1511886929837-354d827aae26?q=80&w=800&auto=format&fit=crop",
       badge: "ICONIC"
     },
     {
+      title: "Football Boots",
+      subtitle: "Pro match-day footwear",
+      category: "Boots",
+      image: "https://images.unsplash.com/photo-1511886929837-354d827aae26?q=80&w=800&auto=format&fit=crop", // صورة أحذية رياضية في الملعب
+      badge: "ELITE"
+    },
+    {
       title: "Pro Equipment",
-      subtitle: "Balls, boots & accessories",
+      subtitle: "Balls, gloves & accessories",
       category: "Equipment",
-      // صورة معدات وكرة قدم وحذاء رياضي احترافي
       image: "https://images.unsplash.com/photo-1518091043644-c1d4457512c6?q=80&w=800&auto=format&fit=crop",
       badge: "PERFORMANCE"
     }
   ];
-
   return (
     <div className="bg-[#0a0a0a] min-h-screen text-white">
       

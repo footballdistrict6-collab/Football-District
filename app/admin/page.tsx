@@ -83,16 +83,17 @@ export default function AdminDashboard() {
     }
 
     const { error } = await supabase.from('products').insert([
-      {
-        title: newProduct.title,
-        price: parseFloat(newProduct.price),
-        category: newProduct.category,
-        league: newProduct.league,
-        imageUrl: newProduct.imageUrl || 'https://images.unsplash.com/photo-1583318433420-532155e9d9e4?q=80&w=500&auto=format&fit=crop',
-        image_urls: newProduct.imageUrl ? [newProduct.imageUrl] : [],
-        loyalty_points_earned: Number(newProduct.loyalty_points_earned) || 20
-      }
-    ]);
+        {
+          title: newProduct.title,
+          price: parseFloat(newProduct.price),
+          category: newProduct.category,
+          league: newProduct.league,
+          // هنا تم التصحيح إلى image_url
+          image_url: newProduct.imageUrl || 'https://images.unsplash.com/photo-1583318433420-532155e9d9e4?q=80&w=500&auto=format&fit=crop',
+          image_urls: newProduct.imageUrl ? [newProduct.imageUrl] : [],
+          loyalty_points_earned: Number(newProduct.loyalty_points_earned) || 20
+        }
+      ]);
 
     if (!error) {
       alert("✅ تم إضافة المنتج بنجاح!");
@@ -115,18 +116,18 @@ export default function AdminDashboard() {
     if (!editingProduct) return;
 
     const { error } = await supabase
-      .from('products')
-      .update({
-        title: editingProduct.title,
-        price: parseFloat(editingProduct.price),
-        category: editingProduct.category,
-        league: editingProduct.league,
-        imageUrl: editingProduct.imageUrl,
-        image_urls: editingProduct.imageUrl ? [editingProduct.imageUrl] : editingProduct.image_urls,
-        loyalty_points_earned: Number(editingProduct.loyalty_points_earned) || 20
-      })
-      .eq('id', editingProduct.id);
-
+    .from('products')
+    .update({
+      title: editingProduct.title,
+      price: parseFloat(editingProduct.price),
+      category: editingProduct.category,
+      league: editingProduct.league,
+      // هنا تم التصحيح إلى image_url
+      image_url: editingProduct.imageUrl,
+      image_urls: editingProduct.imageUrl ? [editingProduct.imageUrl] : editingProduct.image_urls,
+      loyalty_points_earned: Number(editingProduct.loyalty_points_earned) || 20
+    })
+    .eq('id', editingProduct.id);
     if (!error) {
       alert("✅ تم تحديث بيانات المنتج بنجاح!");
       setEditingProduct(null);

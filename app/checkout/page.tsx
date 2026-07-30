@@ -53,14 +53,54 @@ export default function CheckoutPage() {
   }, 0);
 
   // وظيفة تطبيق كود الخصم المستبدل
-  const handleApplyVoucher = (e: React.FormEvent) => {
+// تطبيق أكواد الخصم العادية والعروض الخاصة (Buy One Get One 50% Off)
+const handleApplyVoucher = (e: React.FormEvent) => {
     e.preventDefault();
     setVoucherError(null);
 
     const cleanCode = voucherCode.trim().toUpperCase();
     if (!cleanCode) return;
 
-    // قراءة قيمة الخصم تلقائياً من اسم الكود (مثلاً FD-5OFF أو FD-15OFF)
+    // 1. برومو كود WEEK1 (اشتري 1 واحصل على الثاني بنصف السعر على فئة Kits فقط)
+    if (cleanCode === 'WEEK1') {
+      // جمع كل القمصان التي تنتمي لقسم Kits (Regular Season) وتوسيعها حسب الكمية
+      const regularKits: number[] = [];
+
+      items.forEach((item: any) => {
+        // التحقق من أن المنتج ينتمي إلى Kits وليس Retro أو Special Orders أو Equipment
+        const isRegularKit = 
+          !item.category || 
+          item.category === 'Kits' || 
+          item.category === 'Home Jerseys' || 
+          item.category === 'Away Jerseys' || 
+          item.category === 'Third Jerseys';
+
+        if (isRegularKit) {
+          const qty = Number(item.quantity) || 1;
+          const price = parseFloat(item.price) || 0;
+          for (let i = 0; i < qty; i++) {
+            regularKits.push(price);
+          }
+        }
+      });
+
+      // التحقق من وجود قطعتين على الأقل من القمصان في السلة
+      if (regularKits.length < 2) {
+        setVoucherError('⚠️ Promo code WEEK1 requires at least 2 Regular Season Kits in your bag.');
+        return;
+      }
+
+      // ترتيب أسعار القمصان تصاعدياً (من الأرخص للأغلى) لخصم 50% من القطعة الأرخص/الثانية
+      regularKits.sort((a, b) => a - b);
+      const bogoDiscount = regularKits[0] * 0.5;
+
+      setDiscountAmount(Number(bogoDiscount.toFixed(2)));
+      setAppliedVoucher('WEEK1 (BOGO 50% OFF)');
+      setVoucherCode('');
+      return;
+    }
+
+    // 2. أكواد قسائم الولاء الثابتة (FD-5OFF أو FD-15OFF)
     if (cleanCode.startsWith('FD-5OFF')) {
       setDiscountAmount(5);
       setAppliedVoucher(cleanCode);

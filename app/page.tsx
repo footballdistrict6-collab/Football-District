@@ -40,7 +40,7 @@ export default function HomePage() {
       title: "Retro Kits",
       subtitle: "Timeless football heritage",
       category: "Retro Kits",
-      image: "https://images.unsplash.com/photo-1511886929837-354d827aae26?q=80&w=800&auto=format&fit=crop",
+      image: "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRrHIVrmNyUyEP842ZvAER6Wk1HVfCTlodtDRaDuS1lJKNvHQgjdS4ytyQ&s=10",
       badge: "ICONIC"
     },
     {

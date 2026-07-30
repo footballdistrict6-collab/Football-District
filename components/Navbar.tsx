@@ -1,127 +1,119 @@
 "use client";
 
+import { useState } from 'react';
 import Link from 'next/link';
+import { ChevronDown, ShoppingCart, User, Search, Trophy, Sparkles } from 'lucide-react';
 import { useCartStore } from '@/store/cart';
-import { ShoppingCart, Search, X, User } from 'lucide-react';
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 
 export default function Navbar() {
-  const { cartCount } = useCartStore();
-  const [mounted, setMounted] = useState(false);
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const router = useRouter();
+  const [kitsDropdownOpen, setKitsDropdownOpen] = useState(false);
+  const { items } = useCartStore();
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const totalCartCount = items.reduce((sum, item) => sum + (Number(item.quantity) || 1), 0);
 
-  const handleSearchSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      setIsSearchOpen(false);
-      router.push(`/catalog?search=${encodeURIComponent(searchQuery.trim())}`);
-      setSearchQuery('');
-    }
-  };
+  const topLeagues = [
+    { name: "Premier League", slug: "Premier League" },
+    { name: "La Liga", slug: "La Liga" },
+    { name: "Serie A", slug: "Serie A" },
+    { name: "Bundesliga", slug: "Bundesliga" },
+    { name: "Ligue 1", slug: "Ligue 1" },
+  ];
 
   return (
-    <>
-      <nav className="border-b border-[#1f1f1f] bg-[#0a0a0a]/80 backdrop-blur-md sticky top-0 z-50">
-        <div className="container mx-auto px-6 h-20 flex items-center justify-between">
+    <nav className="bg-[#0a0a0a] border-b border-[#1f1f1f] text-white sticky top-0 z-50">
+      <div className="container mx-auto px-6 h-20 flex items-center justify-between">
+        
+        {/* اللوجو */}
+        <Link href="/" className="text-2xl font-black uppercase tracking-tight">
+          FOOTBALL <span className="text-[#00AEEF]">DISTRICT</span>
+        </Link>
+
+        {/* قائمة روابط الـ Navigation */}
+        <div className="hidden md:flex items-center gap-8 text-sm font-semibold">
           
-          {/* الشعار */}
-          <Link href="/" className="text-2xl font-black tracking-tighter text-white">
-            FOOTBALL <span className="text-[#00AEEF]">DISTRICT</span>
+          {/* قائمة KITS المنسدلة (Dropdown - Shop by League) */}
+          <div 
+            className="relative"
+            onMouseEnter={() => setKitsDropdownOpen(true)}
+            onMouseLeave={() => setKitsDropdownOpen(false)}
+          >
+            <Link 
+              href="/catalog?category=Kits" 
+              className="flex items-center gap-1.5 py-4 text-gray-300 hover:text-[#00AEEF] transition"
+            >
+              Kits <ChevronDown className={`w-4 h-4 transition-transform ${kitsDropdownOpen ? 'rotate-180 text-[#00AEEF]' : ''}`} />
+            </Link>
+
+            {kitsDropdownOpen && (
+              <div className="absolute top-full left-0 w-64 bg-[#121212] border border-[#222] rounded-2xl shadow-2xl py-3 z-50">
+                <div className="px-4 py-1.5 text-[10px] font-extrabold uppercase tracking-wider text-[#00AEEF] flex items-center gap-1.5">
+                  <Trophy className="w-3.5 h-3.5" /> Shop by League
+                </div>
+
+                {topLeagues.map((league) => (
+                  <Link
+                    key={league.slug}
+                    href={`/catalog?league=${encodeURIComponent(league.slug)}`}
+                    className="block px-4 py-2 text-xs font-bold text-gray-300 hover:text-white hover:bg-[#1a1a1a] transition"
+                  >
+                    {league.name}
+                  </Link>
+                ))}
+
+                <div className="border-t border-[#222] my-2 pt-2">
+                  <Link
+                    href="/catalog?category=Retro+Kits"
+                    className="block px-4 py-2 text-xs font-bold text-amber-400 hover:bg-[#1a1a1a] transition"
+                  >
+                    ⏳ Retro Kits
+                  </Link>
+                  <Link
+                    href="/catalog?category=Special+Orders"
+                    className="block px-4 py-2 text-xs font-bold text-purple-400 hover:bg-[#1a1a1a] transition flex items-center justify-between"
+                  >
+                    <span>✈️ Special Orders</span>
+                    <span className="text-[9px] bg-purple-950 text-purple-300 border border-purple-500/40 px-1.5 py-0.5 rounded">PRE-ORDER</span>
+                  </Link>
+                </div>
+              </div>
+            )}
+          </div>
+
+          <Link href="/catalog?category=Boots" className="text-gray-300 hover:text-[#00AEEF] transition">
+            Boots
           </Link>
 
-          {/* أزرار الأقسام في المنتصف */}
-          <div className="hidden md:flex items-center gap-8">
-            <Link 
-              href="/catalog" 
-              className="text-sm font-semibold text-gray-300 hover:text-[#00AEEF] transition"
-            >
-              26/27 Catalog
-            </Link>
-            <Link 
-              href="/catalog?category=Retro+Jerseys" 
-              className="text-sm font-semibold text-gray-300 hover:text-[#00AEEF] transition"
-            >
-              Retro Jerseys
-            </Link>
-            <Link 
-              href="/catalog?category=Equipment" 
-              className="text-sm font-semibold text-gray-300 hover:text-[#00AEEF] transition"
-            >
-              Equipment
-            </Link>
-          </div>
+          <Link href="/catalog?category=Equipment" className="text-gray-300 hover:text-[#00AEEF] transition">
+            Equipment
+          </Link>
 
-          {/* الأيقونات على اليمين - بحث، بروفايل الزبون، وسلة */}
-          <div className="flex items-center gap-6">
-            <button 
-              onClick={() => setIsSearchOpen(true)}
-              className="text-gray-300 hover:text-white transition"
-              title="Search Catalog"
-            >
-              <Search className="w-5 h-5" />
-            </button>
-
-            {/* زر بروفايل الزبون (ينقل لصفحة الولاء وسجل الطلبات فقط) */}
-            <Link 
-              href="/profile" 
-              className="text-gray-300 hover:text-[#00AEEF] transition" 
-              title="My Account & Loyalty Rewards"
-            >
-              <User className="w-5 h-5" />
-            </Link>
-
-            <Link href="/cart" className="relative text-gray-300 hover:text-white transition" title="Shopping Cart">
-              <ShoppingCart className="w-5 h-5" />
-              {mounted && cartCount() > 0 && (
-                <span className="absolute -top-2 -right-2 bg-[#00AEEF] text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center">
-                  {cartCount()}
-                </span>
-              )}
-            </Link>
-          </div>
-
+          <Link 
+            href="/catalog?category=Mystery+Drop" 
+            className="text-amber-400 hover:text-amber-300 transition flex items-center gap-1 font-bold"
+          >
+            <Sparkles className="w-3.5 h-3.5" /> Mystery Drop
+          </Link>
         </div>
-      </nav>
 
-      {/* نافذة البحث المنبثقة */}
-      {isSearchOpen && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-start justify-center pt-24 px-4">
-          <div className="bg-[#121212] border border-[#333] rounded-2xl p-6 max-w-xl w-full shadow-2xl relative">
-            <button 
-              onClick={() => setIsSearchOpen(false)}
-              className="absolute top-4 right-4 text-gray-400 hover:text-white p-2"
-            >
-              <X className="w-5 h-5" />
-            </button>
-
-            <h3 className="text-lg font-bold mb-4 text-gray-300">Search Products</h3>
-
-            <form onSubmit={handleSearchSubmit} className="flex gap-2">
-              <input 
-                type="text" 
-                autoFocus
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Type team name, e.g. Arsenal, Madrid..." 
-                className="flex-1 bg-[#1a1a1a] border border-[#333] rounded-xl p-4 text-white focus:outline-none focus:border-[#00AEEF] transition"
-              />
-              <button 
-                type="submit"
-                className="bg-[#00AEEF] hover:bg-blue-500 text-white font-bold px-6 rounded-xl transition shadow-[0_0_15px_rgba(0,174,239,0.3)]"
-              >
-                Search
-              </button>
-            </form>
-          </div>
+        {/* أزرار البحث، الحساب، والسلة */}
+        <div className="flex items-center gap-4">
+          <Link href="/catalog" className="p-2 text-gray-400 hover:text-white transition">
+            <Search className="w-5 h-5" />
+          </Link>
+          <Link href="/profile" className="p-2 text-gray-400 hover:text-white transition">
+            <User className="w-5 h-5" />
+          </Link>
+          <Link href="/cart" className="relative p-2 text-gray-400 hover:text-white transition">
+            <ShoppingCart className="w-5 h-5" />
+            {totalCartCount > 0 && (
+              <span className="absolute -top-1 -right-1 bg-[#00AEEF] text-white font-bold text-[10px] w-4 h-4 rounded-full flex items-center justify-center">
+                {totalCartCount}
+              </span>
+            )}
+          </Link>
         </div>
-      )}
-    </>
+
+      </div>
+    </nav>
   );
 }

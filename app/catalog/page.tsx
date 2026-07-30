@@ -8,19 +8,22 @@ import { useSearchParams } from 'next/navigation';
 function CatalogContent() {
   const searchParams = useSearchParams();
   const urlCategory = searchParams.get('category');
+  const urlLeague = searchParams.get('league');
   const urlSearch = searchParams.get('search');
 
   const [products, setProducts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedCategory, setSelectedCategory] = useState<string>('All');
+  const [selectedTab, setSelectedTab] = useState<string>('All');
 
   useEffect(() => {
-    if (urlCategory) {
-      setSelectedCategory(urlCategory);
+    if (urlLeague) {
+      setSelectedTab(urlLeague);
+    } else if (urlCategory) {
+      setSelectedTab(urlCategory);
     } else {
-      setSelectedCategory('All');
+      setSelectedTab('All');
     }
-  }, [urlCategory]);
+  }, [urlCategory, urlLeague]);
 
   useEffect(() => {
     async function fetchProducts() {
@@ -39,20 +42,35 @@ function CatalogContent() {
     fetchProducts();
   }, []);
 
-  // تصفية المنتجات حسب الفئة المختارة وحسب كلمة البحث إن وجدت
+  // تصفية المنتجات حسب التبويب (سواء كان دوري أو كاتيغوري)
   const filteredProducts = products.filter((p) => {
-    const matchesCategory = selectedCategory === 'All' || p.category === selectedCategory;
+    const isLeagueTab = ['Premier League', 'La Liga', 'Serie A', 'Bundesliga', 'Ligue 1'].includes(selectedTab);
+    
+    let matchesTab = true;
+    if (selectedTab !== 'All' && selectedTab !== 'Kits') {
+      if (isLeagueTab) {
+        matchesTab = p.league === selectedTab;
+      } else {
+        matchesTab = p.category === selectedTab;
+      }
+    }
+    
     const matchesSearch = !urlSearch || p.title?.toLowerCase().includes(urlSearch.toLowerCase());
-    return matchesCategory && matchesSearch;
+    return matchesTab && matchesSearch;
   });
 
-  const categories = [
+  const filterTabs = [
     'All',
-    'Home Jerseys',
-    'Away Jerseys',
-    'Third Jerseys',
-    'Retro Jerseys',
-    'Equipment'
+    'Premier League',
+    'La Liga',
+    'Serie A',
+    'Bundesliga',
+    'Ligue 1',
+    'Retro Kits',
+    'Special Orders',
+    'Boots',
+    'Equipment',
+    'Mystery Drop'
   ];
 
   return (
@@ -64,33 +82,35 @@ function CatalogContent() {
           <h1 className="text-4xl md:text-5xl font-extrabold uppercase tracking-tight mb-3">
             {urlSearch 
               ? `SEARCH RESULTS FOR: "${urlSearch}"` 
-              : selectedCategory === 'All' 
+              : selectedTab === 'All' 
                 ? '26/27 CATALOG' 
-                : selectedCategory.toUpperCase()}
+                : selectedTab.toUpperCase()}
           </h1>
           <p className="text-gray-400">
-            Browse the official kits and gear for the season.
+            {selectedTab === 'Special Orders'
+              ? '✈️ Custom pre-order jerseys. Estimated delivery time applies.'
+              : 'Browse our official kits, footwear, and professional gear.'}
           </p>
         </div>
 
-        {/* أزرار الفلترة السريعة (Filter Tabs) */}
+        {/* أزرار الفلترة السريعة */}
         <div className="flex flex-wrap gap-2 mb-12 border-b border-[#1f1f1f] pb-6">
-          {categories.map((cat) => (
+          {filterTabs.map((tab) => (
             <button
-              key={cat}
-              onClick={() => setSelectedCategory(cat)}
-              className={`px-5 py-2 rounded-full text-sm font-semibold transition ${
-                selectedCategory === cat
+              key={tab}
+              onClick={() => setSelectedTab(tab)}
+              className={`px-4 py-2 rounded-full text-xs md:text-sm font-semibold transition ${
+                selectedTab === tab
                   ? 'bg-[#00AEEF] text-white shadow-[0_0_15px_rgba(0,174,239,0.3)]'
                   : 'bg-[#121212] text-gray-400 hover:text-white hover:bg-[#1a1a1a] border border-[#1f1f1f]'
               }`}
             >
-              {cat}
+              {tab === 'Special Orders' ? '✈️ Special Orders' : tab}
             </button>
           ))}
         </div>
 
-        {/* شبكة عرض المنتجات */}
+        {/* شبكة المنتجات */}
         {loading ? (
           <div className="py-20 text-center text-gray-400">
             Loading products...
@@ -98,7 +118,7 @@ function CatalogContent() {
         ) : filteredProducts.length === 0 ? (
           <div className="py-20 text-center bg-[#121212] rounded-2xl border border-[#1f1f1f]">
             <p className="text-xl font-bold mb-2">No items found</p>
-            <p className="text-gray-400">Try searching for a different team or selecting another category.</p>
+            <p className="text-gray-400">We couldn't find any items matching your selected category or league.</p>
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-8">
@@ -113,7 +133,7 @@ function CatalogContent() {
                   id={product.id}
                   title={product.title}
                   price={product.price?.toString() || '0'}
-                  category={product.category || 'Jerseys'}
+                  category={product.category || 'Kits'}
                   imageUrl={imgUrl}
                   loyaltyPoints={Number(product.loyalty_points_earned) || 20}
                 />

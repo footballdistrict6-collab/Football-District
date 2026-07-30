@@ -52,8 +52,7 @@ export default function CheckoutPage() {
     return sum + (itemPts * (Number(item.quantity) || 1));
   }, 0);
 
-  // وظيفة تطبيق كود الخصم المستبدل
-// تطبيق أكواد الخصم العادية والعروض الخاصة (Buy One Get One 50% Off)
+// تطبيق أكواد الخصم العادية والعروض الخاصة (BOGO 50% & Free Kit with Boots)
 const handleApplyVoucher = (e: React.FormEvent) => {
     e.preventDefault();
     setVoucherError(null);
@@ -63,11 +62,9 @@ const handleApplyVoucher = (e: React.FormEvent) => {
 
     // 1. برومو كود WEEK1 (اشتري 1 واحصل على الثاني بنصف السعر على فئة Kits فقط)
     if (cleanCode === 'WEEK1') {
-      // جمع كل القمصان التي تنتمي لقسم Kits (Regular Season) وتوسيعها حسب الكمية
       const regularKits: number[] = [];
 
       items.forEach((item: any) => {
-        // التحقق من أن المنتج ينتمي إلى Kits وليس Retro أو Special Orders أو Equipment
         const isRegularKit = 
           !item.category || 
           item.category === 'Kits' || 
@@ -84,13 +81,11 @@ const handleApplyVoucher = (e: React.FormEvent) => {
         }
       });
 
-      // التحقق من وجود قطعتين على الأقل من القمصان في السلة
       if (regularKits.length < 2) {
         setVoucherError('⚠️ Promo code WEEK1 requires at least 2 Regular Season Kits in your bag.');
         return;
       }
 
-      // ترتيب أسعار القمصان تصاعدياً (من الأرخص للأغلى) لخصم 50% من القطعة الأرخص/الثانية
       regularKits.sort((a, b) => a - b);
       const bogoDiscount = regularKits[0] * 0.5;
 
@@ -100,7 +95,51 @@ const handleApplyVoucher = (e: React.FormEvent) => {
       return;
     }
 
-    // 2. أكواد قسائم الولاء الثابتة (FD-5OFF أو FD-15OFF)
+    // 2. برومو كود SHOES1 (اشتري حذاء Boots واحصل على تيشيرت Kits مجاناً)
+    if (cleanCode === 'SHOES1') {
+      let hasBoots = false;
+      const regularKits: number[] = [];
+
+      items.forEach((item: any) => {
+        // التحقق من وجود حذاء في السلة
+        if (item.category === 'Boots' || item.category?.toLowerCase().includes('boot')) {
+          hasBoots = true;
+        }
+
+        // جمع القمصان العادية لمعرفة سعر القميص الذي سيصبح مجاناً
+        const isRegularKit = 
+          !item.category || 
+          item.category === 'Kits' || 
+          item.category === 'Home Jerseys' || 
+          item.category === 'Away Jerseys' || 
+          item.category === 'Third Jerseys';
+
+        if (isRegularKit) {
+          const qty = Number(item.quantity) || 1;
+          const price = parseFloat(item.price) || 0;
+          for (let i = 0; i < qty; i++) {
+            regularKits.push(price);
+          }
+        }
+      });
+
+      // التحقق من تحقق الشرطين معاً (حذاء + قميص)
+      if (!hasBoots || regularKits.length === 0) {
+        setVoucherError('⚠️ Promo code SHOES1 requires at least 1 Pair of Boots AND 1 Regular Season Kit.');
+        return;
+      }
+
+      // ترتيب القمصان من الأرخص لخصم سعر القميص بالكامل (100% Free Kit)
+      regularKits.sort((a, b) => a - b);
+      const freeKitDiscount = regularKits[0]; // خصم كامل سعر التيشيرت
+
+      setDiscountAmount(Number(freeKitDiscount.toFixed(2)));
+      setAppliedVoucher('SHOES1 (FREE KIT WITH BOOTS)');
+      setVoucherCode('');
+      return;
+    }
+
+    // 3. أكواد قسائم الولاء الثابتة (FD-5OFF أو FD-15OFF)
     if (cleanCode.startsWith('FD-5OFF')) {
       setDiscountAmount(5);
       setAppliedVoucher(cleanCode);

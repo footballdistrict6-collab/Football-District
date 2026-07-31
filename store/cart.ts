@@ -7,6 +7,7 @@ export interface CartItem {
     image: string;
     quantity: number;
     loyalty_points_earned?: number; // <-- أضف هذا السطر هنا
+    category?: string;
   }
 
 interface CartStore {

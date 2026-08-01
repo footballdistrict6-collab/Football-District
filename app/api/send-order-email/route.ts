@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { Resend } from 'resend';
 
-// المفتاح السري لخدمة Resend (سنضعه في ملف .env.local)
+// المفتاح السري لخدمة Resend (موجود في ملف .env.local)
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function POST(request: Request) {
@@ -18,10 +18,10 @@ export async function POST(request: Request) {
           .join('')
       : '<li>No items details</li>';
 
-    // إرسال الإيميل إلى حسابك مباشرة
+    // إرسال الإيميل
     const data = await resend.emails.send({
       from: 'Football District Store <onboarding@resend.dev>', // الإيميل الافتراضي المجاني من Resend
-      to: ['footballdistrict812@gmail.com'], // إيميلك الذي ستصل إليه الإشعارات
+      to: ['footballdistrict6@gmail.com'], // 👈 تم التعديل إلى الإيميل الجديد هنا
       subject: `🚨 NEW ORDER RECEIVED #${order.id ? order.id.slice(0, 8).toUpperCase() : 'NEW'} - $${order.total_amount}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background: #0a0a0a; color: #ffffff; padding: 24px; border-radius: 12px; border: 1px solid #222;">

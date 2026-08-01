@@ -14,6 +14,7 @@ import {
   Sparkles 
 } from 'lucide-react';
 import Link from 'next/link';
+import SizeGuideModal from '@/components/SizeGuideModal';
 
 const AVAILABLE_SIZES = ['S', 'M', 'L', 'XL'];
 
@@ -36,6 +37,9 @@ export default function ProductDetailPage({ params }: PageProps) {
   const [isCustomized, setIsCustomized] = useState(false);
   const [customName, setCustomName] = useState('');
   const [customNumber, setCustomNumber] = useState('');
+
+  // --- حالة نافذة دليل المقاسات ---
+  const [isSizeGuideOpen, setIsSizeGuideOpen] = useState(false);
 
   const { addItem } = useCartStore();
 
@@ -196,9 +200,12 @@ export default function ProductDetailPage({ params }: PageProps) {
                 <label className="block text-xs font-extrabold uppercase text-gray-400 tracking-wider">
                   Select Size (Adult)
                 </label>
-                <span className="text-xs text-[#00AEEF] font-semibold cursor-pointer hover:underline">
-                  Size Guide
-                </span>
+                <button 
+                  onClick={() => setIsSizeGuideOpen(true)}
+                  className="text-xs text-[#00AEEF] font-bold cursor-pointer hover:underline flex items-center gap-1"
+                >
+                  View Size Guide
+                </button>
               </div>
               <div className="flex flex-wrap gap-3">
                 {AVAILABLE_SIZES.map((size) => (
@@ -243,7 +250,7 @@ export default function ProductDetailPage({ params }: PageProps) {
                         maxLength={12}
                         placeholder="NAME (e.g. MESSI)"
                         value={customName}
-                        onChange={(e) => setCustomName(e.target.value.replace(/[^a-zA-Z\s]/g, '').toUpperCase())}
+                        onChange={(e) => setCustomName(e.target.value.toUpperCase())}
                         className="w-full bg-[#1a1a1a] border border-[#2b2b2b] rounded-xl p-3 text-white text-sm font-bold focus:border-[#00AEEF] focus:outline-none placeholder-gray-600"
                       />
                     </div>
@@ -290,6 +297,12 @@ export default function ProductDetailPage({ params }: PageProps) {
           </div>
         </div>
       </div>
+      
+      {/* استدعاء نافذة دليل المقاسات */}
+      <SizeGuideModal 
+        isOpen={isSizeGuideOpen} 
+        onClose={() => setIsSizeGuideOpen(false)} 
+      />
     </div>
   );
 }

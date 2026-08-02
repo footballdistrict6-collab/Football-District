@@ -16,7 +16,9 @@ import {
 import Link from 'next/link';
 import SizeGuideModal from '@/components/SizeGuideModal';
 
-const AVAILABLE_SIZES = ['S', 'M', 'L', 'XL'];
+// تعريف قوائم المقاسات المختلفة
+const KIT_SIZES = ['S', 'M', 'L', 'XL'];
+const BOOT_SIZES = ['38', '39', '40', '41', '42', '43', '44', '45'];
 
 interface PageProps {
   params: Promise<{
@@ -29,7 +31,7 @@ export default function ProductDetailPage({ params }: PageProps) {
 
   const [product, setProduct] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedSize, setSelectedSize] = useState('L');
+  const [selectedSize, setSelectedSize] = useState(''); // فارغ مبدئياً حتى نعرف نوع المنتج
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [addedToCart, setAddedToCart] = useState(false);
 
@@ -54,6 +56,10 @@ export default function ProductDetailPage({ params }: PageProps) {
 
       if (data && !error) {
         setProduct(data);
+        
+        // تحديد المقاس الافتراضي بناءً على نوع المنتج
+        const isBoot = data.category?.toLowerCase().includes('boot') || data.category === 'Boots';
+        setSelectedSize(isBoot ? '42' : 'L');
       }
       setLoading(false);
     }
@@ -92,15 +98,17 @@ export default function ProductDetailPage({ params }: PageProps) {
 
   const isSpecialOrder = product.category === 'Special Orders' || product.category?.toLowerCase().includes('special');
   
-  // هل المنتج قابل للطباعة (فقط القمصان)؟
+  // التحقق من نوع المنتج لعرض المقاسات المناسبة
+  const isBootCategory = product.category?.toLowerCase().includes('boot') || product.category === 'Boots';
   const isPrintable = product.category === 'Kits' || product.category === 'Retro Kits' || product.category?.toLowerCase().includes('jersey');
+  
+  const currentAvailableSizes = isBootCategory ? BOOT_SIZES : KIT_SIZES;
 
   // حساب السعر النهائي (زيادة 5$ إذا تم تفعيل الطباعة)
   const basePrice = parseFloat(product.price) || 0;
   const finalPrice = isCustomized ? basePrice + 5.00 : basePrice;
 
   const handleAddToCart = () => {
-    // التحقق من إدخال الاسم والرقم في حال تفعيل الطباعة
     if (isCustomized && (!customName.trim() || !customNumber.trim())) {
       alert('⚠️ Please enter both the Name and Number for your custom print.');
       return;
@@ -108,7 +116,6 @@ export default function ProductDetailPage({ params }: PageProps) {
 
     const finalPoints = Number(product.loyalty_points_earned) > 0 ? Number(product.loyalty_points_earned) : 20;
 
-    // تجهيز معرّف وعنوان فريد للمنتج المطبوع حتى لا يندمج مع منتج غير مطبوع في السلة
     const cartItemId = isCustomized 
       ? `${product.id}-${selectedSize}-PRINT-${customName}-${customNumber}` 
       : `${product.id}-${selectedSize}`;
@@ -141,7 +148,6 @@ export default function ProductDetailPage({ params }: PageProps) {
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
           
-          {/* معرض الصور */}
           <div className="lg:col-span-7 space-y-4">
             <div className="relative h-[450px] md:h-[550px] bg-[#121212] border border-[#1f1f1f] rounded-2xl overflow-hidden flex items-center justify-center">
               <img src={mainImage} alt={product.title} className="object-cover h-full w-full opacity-90 hover:opacity-100 transition duration-500" />
@@ -166,7 +172,6 @@ export default function ProductDetailPage({ params }: PageProps) {
             )}
           </div>
 
-          {/* تفاصيل المنتج */}
           <div className="lg:col-span-5 bg-[#121212] p-6 md:p-8 rounded-2xl border border-[#1f1f1f] space-y-6 sticky top-24">
             
             <div className="flex items-center gap-2 flex-wrap">
@@ -194,21 +199,24 @@ export default function ProductDetailPage({ params }: PageProps) {
               </div>
             </div>
 
-            {/* خيار اختيار المقاس */}
+            {/* خيار اختيار المقاس المتكيف مع نوع المنتج */}
             <div className="border-t border-[#222] pt-6">
               <div className="flex justify-between items-center mb-3">
                 <label className="block text-xs font-extrabold uppercase text-gray-400 tracking-wider">
-                  Select Size (Adult)
+                  Select Size {isBootCategory ? '(EU)' : '(Adult)'}
                 </label>
-                <button 
-                  onClick={() => setIsSizeGuideOpen(true)}
-                  className="text-xs text-[#00AEEF] font-bold cursor-pointer hover:underline flex items-center gap-1"
-                >
-                  View Size Guide
-                </button>
+                {/* إخفاء دليل المقاسات إذا كان المنتج حذاءً */}
+                {!isBootCategory && (
+                  <button 
+                    onClick={() => setIsSizeGuideOpen(true)}
+                    className="text-xs text-[#00AEEF] font-bold cursor-pointer hover:underline flex items-center gap-1"
+                  >
+                    View Size Guide
+                  </button>
+                )}
               </div>
               <div className="flex flex-wrap gap-3">
-                {AVAILABLE_SIZES.map((size) => (
+                {currentAvailableSizes.map((size) => (
                   <button key={size} type="button" onClick={() => setSelectedSize(size)} className={`w-14 h-12 rounded-xl font-bold text-sm transition border flex items-center justify-center ${selectedSize === size ? 'bg-[#00AEEF] text-white border-[#00AEEF] shadow-[0_0_15px_rgba(0,174,239,0.4)]' : 'bg-[#1a1a1a] text-gray-300 border-[#2b2b2b] hover:border-gray-500'}`}>
                     {size}
                   </button>
@@ -216,7 +224,7 @@ export default function ProductDetailPage({ params }: PageProps) {
               </div>
             </div>
 
-            {/* نظام طباعة الاسم والرقم (Customization Module) */}
+            {/* نظام طباعة الاسم والرقم (يظهر للقمصان فقط) */}
             {isPrintable && (
               <div className="border-t border-[#222] pt-6 transition-all">
                 <div className="flex items-center justify-between mb-4">
@@ -227,7 +235,6 @@ export default function ProductDetailPage({ params }: PageProps) {
                     <p className="text-xs text-gray-400 mt-1">Add a custom name & number <strong className="text-green-400">(+$5.00)</strong></p>
                   </div>
                   
-                  {/* Toggle Switch */}
                   <button 
                     onClick={() => {
                       setIsCustomized(!isCustomized);

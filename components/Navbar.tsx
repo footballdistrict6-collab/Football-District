@@ -103,6 +103,15 @@ export default function Navbar() {
                     <span>✈️ Special Orders</span>
                     <span className="text-[9px] bg-purple-950 text-purple-300 border border-purple-500/40 px-1.5 py-0.5 rounded">PRE-ORDER</span>
                   </Link>
+                  
+                  {/* --- قسم الأطفال المضاف حديثاً للكمبيوتر --- */}
+                  <Link
+                    href="/catalog?category=Kids"
+                    className="block px-4 py-2 text-xs font-bold text-green-400 hover:bg-[#1a1a1a] transition flex items-center justify-between"
+                  >
+                    <span>👶 Kids Kits</span>
+                    <span className="text-[9px] bg-green-950 text-green-300 border border-green-500/40 px-1.5 py-0.5 rounded">NEW</span>
+                  </Link>
                 </div>
               </div>
             )}
@@ -192,7 +201,7 @@ export default function Navbar() {
                 <Search className="w-4 h-4 text-gray-400 absolute left-3.5 top-3.5" />
               </div>
 
-              {/* رابط السلة البارز في أعلى القائمة (مثل صورتك) */}
+              {/* رابط السلة البارز في أعلى القائمة */}
               <Link
                 href="/cart"
                 onClick={() => setMobileMenuOpen(false)}
@@ -270,6 +279,16 @@ export default function Navbar() {
                           <span>✈️ Special Orders</span>
                           <span className="text-[9px] bg-purple-950 text-purple-300 border border-purple-500/40 px-1.5 py-0.5 rounded">PRE-ORDER</span>
                         </Link>
+                        
+                        {/* --- قسم الأطفال المضاف حديثاً للجوال --- */}
+                        <Link
+                          href="/catalog?category=Kids"
+                          onClick={() => setMobileMenuOpen(false)}
+                          className="py-1.5 text-green-400 hover:text-green-300 flex items-center justify-between"
+                        >
+                          <span>👶 Kids Kits</span>
+                          <span className="text-[9px] bg-green-950 text-green-300 border border-green-500/40 px-1.5 py-0.5 rounded">NEW</span>
+                        </Link>
                       </div>
                     </div>
                   )}
@@ -304,7 +323,6 @@ export default function Navbar() {
                 </Link>
 
               </div>
-
             </div>
 
             {/* تذييل القائمة الجانبية */}
@@ -314,7 +332,6 @@ export default function Navbar() {
             </div>
 
           </div>
-
         </div>
       )}
 

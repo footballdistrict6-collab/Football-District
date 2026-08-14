@@ -59,6 +59,7 @@ function CatalogContent() {
     return matchesTab && matchesSearch;
   });
 
+  // تمت إضافة Kids إلى مصفوفة الفلترة هنا
   const filterTabs = [
     'All',
     'Premier League',
@@ -67,6 +68,7 @@ function CatalogContent() {
     'Bundesliga',
     'Ligue 1',
     'Retro Kits',
+    'Kids',
     'Special Orders',
     'Boots',
     'Equipment',
@@ -77,19 +79,23 @@ function CatalogContent() {
     <div className="bg-[#0a0a0a] min-h-screen py-16 text-white">
       <div className="container mx-auto px-6">
         
-        {/* الترويسة */}
+        {/* الترويسة الذكية (تتغير حسب الفلتر المختار) */}
         <div className="mb-10">
           <h1 className="text-4xl md:text-5xl font-extrabold uppercase tracking-tight mb-3">
             {urlSearch 
               ? `SEARCH RESULTS FOR: "${urlSearch}"` 
               : selectedTab === 'All' 
                 ? '26/27 CATALOG' 
-                : selectedTab.toUpperCase()}
+                : selectedTab === 'Kids' 
+                  ? 'KIDS KITS 👶'
+                  : selectedTab.toUpperCase()}
           </h1>
           <p className="text-gray-400">
             {selectedTab === 'Special Orders'
               ? '✈️ Custom pre-order jerseys. Estimated delivery time applies.'
-              : 'Browse our official kits, footwear, and professional gear.'}
+              : selectedTab === 'Kids'
+                ? '👶 Shop official football kits and gear for the little champions.'
+                : 'Browse our official kits, footwear, and professional gear.'}
           </p>
         </div>
 
@@ -99,13 +105,13 @@ function CatalogContent() {
             <button
               key={tab}
               onClick={() => setSelectedTab(tab)}
-              className={`px-4 py-2 rounded-full text-xs md:text-sm font-semibold transition ${
+              className={`px-4 py-2 rounded-full text-xs md:text-sm font-semibold transition flex items-center gap-1 ${
                 selectedTab === tab
                   ? 'bg-[#00AEEF] text-white shadow-[0_0_15px_rgba(0,174,239,0.3)]'
                   : 'bg-[#121212] text-gray-400 hover:text-white hover:bg-[#1a1a1a] border border-[#1f1f1f]'
               }`}
             >
-              {tab === 'Special Orders' ? '✈️ Special Orders' : tab}
+              {tab === 'Special Orders' ? '✈️ Special Orders' : tab === 'Kids' ? '👶 Kids' : tab}
             </button>
           ))}
         </div>

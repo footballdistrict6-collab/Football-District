@@ -16,9 +16,10 @@ import {
 import Link from 'next/link';
 import SizeGuideModal from '@/components/SizeGuideModal';
 
-// تعريف قوائم المقاسات المختلفة
+// مصفوفات المقاسات المحدثة
 const KIT_SIZES = ['S', 'M', 'L', 'XL'];
 const BOOT_SIZES = ['38', '39', '40', '41', '42', '43', '44', '45'];
+const KIDS_SIZES = ['2-4', '4-5', '5-6', '7-8', '9', '10-11', '12-13']; // مقاسات الأطفال الجديدة
 
 interface PageProps {
   params: Promise<{
@@ -31,16 +32,14 @@ export default function ProductDetailPage({ params }: PageProps) {
 
   const [product, setProduct] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedSize, setSelectedSize] = useState(''); // فارغ مبدئياً حتى نعرف نوع المنتج
+  const [selectedSize, setSelectedSize] = useState('');
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [addedToCart, setAddedToCart] = useState(false);
 
-  // --- حالات الطباعة المخصصة (Custom Printing) ---
   const [isCustomized, setIsCustomized] = useState(false);
   const [customName, setCustomName] = useState('');
   const [customNumber, setCustomNumber] = useState('');
 
-  // --- حالة نافذة دليل المقاسات ---
   const [isSizeGuideOpen, setIsSizeGuideOpen] = useState(false);
 
   const { addItem } = useCartStore();
@@ -57,9 +56,12 @@ export default function ProductDetailPage({ params }: PageProps) {
       if (data && !error) {
         setProduct(data);
         
-        // تحديد المقاس الافتراضي بناءً على نوع المنتج
-        const isBoot = data.category?.toLowerCase().includes('boot') || data.category === 'Boots';
-        setSelectedSize(isBoot ? '42' : 'L');
+        const categoryLower = data.category?.toLowerCase() || '';
+        const isBoot = categoryLower.includes('boot') || data.category === 'Boots';
+        const isKids = categoryLower === 'kids' || categoryLower.includes('kids');
+        
+        // تحديد المقاس الافتراضي
+        setSelectedSize(isBoot ? '42' : isKids ? '7-8' : 'L');
       }
       setLoading(false);
     }
@@ -96,15 +98,17 @@ export default function ProductDetailPage({ params }: PageProps) {
 
   const mainImage = galleryImages[activeImageIndex] || galleryImages[0];
 
-  const isSpecialOrder = product.category === 'Special Orders' || product.category?.toLowerCase().includes('special');
+  const categoryLower = product.category?.toLowerCase() || '';
+  const isSpecialOrder = product.category === 'Special Orders' || categoryLower.includes('special');
   
-  // التحقق من نوع المنتج لعرض المقاسات المناسبة
-  const isBootCategory = product.category?.toLowerCase().includes('boot') || product.category === 'Boots';
-  const isPrintable = product.category === 'Kits' || product.category === 'Retro Kits' || product.category?.toLowerCase().includes('jersey');
+  const isBootCategory = categoryLower.includes('boot') || product.category === 'Boots';
+  const isKidsCategory = categoryLower === 'kids' || categoryLower.includes('kids');
+  const isPrintable = product.category === 'Kits' || product.category === 'Retro Kits' || isKidsCategory || categoryLower.includes('jersey');
   
-  const currentAvailableSizes = isBootCategory ? BOOT_SIZES : KIT_SIZES;
+  let currentAvailableSizes = KIT_SIZES;
+  if (isBootCategory) currentAvailableSizes = BOOT_SIZES;
+  else if (isKidsCategory) currentAvailableSizes = KIDS_SIZES;
 
-  // حساب السعر النهائي (زيادة 5$ إذا تم تفعيل الطباعة)
   const basePrice = parseFloat(product.price) || 0;
   const finalPrice = isCustomized ? basePrice + 5.00 : basePrice;
 
@@ -193,19 +197,15 @@ export default function ProductDetailPage({ params }: PageProps) {
                 <span className="text-3xl font-black text-white transition-all">
                   ${finalPrice.toFixed(2)}
                 </span>
-                <span className="text-xs bg-amber-500/10 text-amber-400 border border-amber-500/30 font-bold px-2.5 py-1 rounded-md">
-                  +{Number(product.loyalty_points_earned) > 0 ? Number(product.loyalty_points_earned) : 20} Loyalty PTS
-                </span>
               </div>
             </div>
 
-            {/* خيار اختيار المقاس المتكيف مع نوع المنتج */}
             <div className="border-t border-[#222] pt-6">
               <div className="flex justify-between items-center mb-3">
                 <label className="block text-xs font-extrabold uppercase text-gray-400 tracking-wider">
-                  Select Size {isBootCategory ? '(EU)' : '(Adult)'}
+                  Select Size {isBootCategory ? '(EU)' : isKidsCategory ? '(Age)' : '(Adult)'}
                 </label>
-                {/* إخفاء دليل المقاسات إذا كان المنتج حذاءً */}
+                {/* إظهار الدليل لكل المنتجات عدا الأحذية */}
                 {!isBootCategory && (
                   <button 
                     onClick={() => setIsSizeGuideOpen(true)}
@@ -217,14 +217,13 @@ export default function ProductDetailPage({ params }: PageProps) {
               </div>
               <div className="flex flex-wrap gap-3">
                 {currentAvailableSizes.map((size) => (
-                  <button key={size} type="button" onClick={() => setSelectedSize(size)} className={`w-14 h-12 rounded-xl font-bold text-sm transition border flex items-center justify-center ${selectedSize === size ? 'bg-[#00AEEF] text-white border-[#00AEEF] shadow-[0_0_15px_rgba(0,174,239,0.4)]' : 'bg-[#1a1a1a] text-gray-300 border-[#2b2b2b] hover:border-gray-500'}`}>
+                  <button key={size} type="button" onClick={() => setSelectedSize(size)} className={`px-4 h-12 rounded-xl font-bold text-sm transition border flex items-center justify-center min-w-[3.5rem] ${selectedSize === size ? 'bg-[#00AEEF] text-white border-[#00AEEF] shadow-[0_0_15px_rgba(0,174,239,0.4)]' : 'bg-[#1a1a1a] text-gray-300 border-[#2b2b2b] hover:border-gray-500'}`}>
                     {size}
                   </button>
                 ))}
               </div>
             </div>
 
-            {/* نظام طباعة الاسم والرقم (يظهر للقمصان فقط) */}
             {isPrintable && (
               <div className="border-t border-[#222] pt-6 transition-all">
                 <div className="flex items-center justify-between mb-4">
@@ -305,7 +304,6 @@ export default function ProductDetailPage({ params }: PageProps) {
         </div>
       </div>
       
-      {/* استدعاء نافذة دليل المقاسات */}
       <SizeGuideModal 
         isOpen={isSizeGuideOpen} 
         onClose={() => setIsSizeGuideOpen(false)} 

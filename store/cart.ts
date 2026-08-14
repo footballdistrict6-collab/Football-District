@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware'; // 👈 استدعاء خاصية الحفظ
+import { persist } from 'zustand/middleware';
 
 export interface CartItem {
   id: string;
@@ -16,10 +16,10 @@ interface CartState {
   addItem: (item: CartItem) => void;
   removeItem: (id: string) => void;
   clearCart: () => void;
-  // إذا كان لديك دوال أخرى مثل تقليل الكمية ضعها هنا
+  // أضفنا تعريف دالة تحديث الكمية هنا
+  updateQuantity: (id: string, quantity: number) => void; 
 }
 
-// 👈 تغليف الـ Store بـ persist
 export const useCartStore = create<CartState>()(
   persist(
     (set) => ({
@@ -47,11 +47,20 @@ export const useCartStore = create<CartState>()(
 
       // دالة تفريغ السلة
       clearCart: () => set({ items: [] }),
-      
-      // إذا كان لديك دوال أخرى في ملفك الحالي، انسخها وضعها هنا...
+
+      // دالة تحديث الكمية (التي كانت تسبب الخطأ)
+      updateQuantity: (id, quantity) => set((state) => ({
+        items: state.items.map((item) =>
+          item.id === id
+            // نستخدم Math.max لضمان أن الكمية لا تقل عن 1 أبداً
+            ? { ...item, quantity: Math.max(1, quantity) } 
+            : item
+        ),
+      })),
+
     }),
     {
-      name: 'football-district-cart', // 👈 هذا هو اسم الملف الذي سيُحفظ في المتصفح
+      name: 'football-district-cart', // اسم الملف المحفوظ في ذاكرة المتصفح
     }
   )
 );

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from 'react';
-import { X, Ruler, User, Info, Shirt } from 'lucide-react';
+import { X, Ruler, User, Info, Shirt, Users } from 'lucide-react';
 
 interface SizeGuideModalProps {
   isOpen: boolean;
@@ -9,12 +9,11 @@ interface SizeGuideModalProps {
 }
 
 export default function SizeGuideModal({ isOpen, onClose }: SizeGuideModalProps) {
-  // للتحكم بالتبويب النشط (Player أو Fan)
-  const [activeTab, setActiveTab] = useState<'player' | 'fan'>('player');
+  // التبويبات المتاحة: لاعب، جمهور، أطفال
+  const [activeTab, setActiveTab] = useState<'player' | 'fan' | 'kids'>('player');
 
   if (!isOpen) return null;
 
-  // بيانات نسخة اللاعبين (Player Version)
   const playerSizeData = [
     { size: 'S', length: '69 CM', width: '49-51 CM', height: '162-170 CM', weight: '50-62 KG' },
     { size: 'M', length: '69-71 CM', width: '51-53 CM', height: '170-176 CM', weight: '62-78 KG' },
@@ -22,7 +21,6 @@ export default function SizeGuideModal({ isOpen, onClose }: SizeGuideModalProps)
     { size: 'XL', length: '73-75 CM', width: '55-57 CM', height: '182-190 CM', weight: '83-90 KG' },
   ];
 
-  // بيانات نسخة الجماهير (Fan Version)
   const fanSizeData = [
     { size: 'S', length: '70 CM', width: '100 CM', height: '165-170 CM', weight: '50-60 KG' },
     { size: 'M', length: '73 CM', width: '104 CM', height: '170-175 CM', weight: '60-70 KG' },
@@ -30,20 +28,28 @@ export default function SizeGuideModal({ isOpen, onClose }: SizeGuideModalProps)
     { size: 'XL', length: '77 CM', width: '112 CM', height: '175-185 CM', weight: '80-90 KG' },
   ];
 
-  const currentData = activeTab === 'player' ? playerSizeData : fanSizeData;
+  // بيانات الأطفال المأخوذة من صورتك (بدون خانة الطول والوزن)
+  const kidsSizeData = [
+    { size: '2-4', length: '44 CM', width: '35 CM' },
+    { size: '4-5', length: '47 CM', width: '37 CM' },
+    { size: '5-6', length: '50 CM', width: '39 CM' },
+    { size: '7-8', length: '53 CM', width: '41 CM' },
+    { size: '9', length: '56 CM', width: '43 CM' },
+    { size: '10-11', length: '59 CM', width: '45 CM' },
+    { size: '12-13', length: '62 CM', width: '47 CM' },
+  ];
+
+  const currentData = activeTab === 'player' ? playerSizeData : activeTab === 'fan' ? fanSizeData : kidsSizeData;
 
   return (
     <div className="fixed inset-0 z-[120] flex items-center justify-center p-4">
-      {/* الخلفية المظلمة */}
       <div 
         className="absolute inset-0 bg-black/80 backdrop-blur-sm transition-opacity"
         onClick={onClose}
       />
 
-      {/* صندوق الدليل */}
       <div className="relative w-full max-w-2xl bg-[#0d0d0d] border border-[#222] rounded-3xl shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300">
         
-        {/* الترويسة */}
         <div className="flex items-center justify-between p-6 border-b border-[#222] bg-[#121212]">
           <h2 className="text-xl font-black uppercase tracking-tight text-white flex items-center gap-2">
             <Ruler className="w-5 h-5 text-[#00AEEF]" /> 
@@ -57,75 +63,90 @@ export default function SizeGuideModal({ isOpen, onClose }: SizeGuideModalProps)
           </button>
         </div>
 
-        {/* أزرار التبويبات (Tabs) */}
+        {/* أزرار التبويبات الثلاثة */}
         <div className="p-6 pb-2">
-          <div className="flex bg-[#1a1a1a] rounded-xl p-1 border border-[#2b2b2b]">
+          <div className="flex bg-[#1a1a1a] rounded-xl p-1 border border-[#2b2b2b] overflow-x-auto snap-x">
             <button
               onClick={() => setActiveTab('player')}
-              className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${
-                activeTab === 'player' 
-                  ? 'bg-[#00AEEF] text-white shadow-md' 
-                  : 'text-gray-400 hover:text-gray-200'
+              className={`flex-1 min-w-[120px] py-2.5 text-xs sm:text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 sm:gap-2 snap-center ${
+                activeTab === 'player' ? 'bg-[#00AEEF] text-white shadow-md' : 'text-gray-400 hover:text-gray-200'
               }`}
             >
-              <Shirt className="w-4 h-4" /> Player Version
+              <Shirt className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Player
             </button>
             <button
               onClick={() => setActiveTab('fan')}
-              className={`flex-1 py-2.5 text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-2 ${
-                activeTab === 'fan' 
-                  ? 'bg-[#00AEEF] text-white shadow-md' 
-                  : 'text-gray-400 hover:text-gray-200'
+              className={`flex-1 min-w-[120px] py-2.5 text-xs sm:text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 sm:gap-2 snap-center ${
+                activeTab === 'fan' ? 'bg-[#00AEEF] text-white shadow-md' : 'text-gray-400 hover:text-gray-200'
               }`}
             >
-              <User className="w-4 h-4" /> Fan Version
+              <User className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Fan
+            </button>
+            <button
+              onClick={() => setActiveTab('kids')}
+              className={`flex-1 min-w-[120px] py-2.5 text-xs sm:text-sm font-bold rounded-lg transition-all flex items-center justify-center gap-1.5 sm:gap-2 snap-center ${
+                activeTab === 'kids' ? 'bg-[#00AEEF] text-white shadow-md' : 'text-gray-400 hover:text-gray-200'
+              }`}
+            >
+              <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Kids
             </button>
           </div>
         </div>
 
-        {/* الجدول التفاعلي */}
-        <div className="p-6 pt-2 overflow-x-auto">
+        {/* الجدول التفاعلي (يتغير حسب التبويب) */}
+        <div className="p-6 pt-2 overflow-x-auto max-h-[50vh] sm:max-h-[60vh] overflow-y-auto">
           <table className="w-full text-left border-collapse">
-            <thead>
+            <thead className="sticky top-0 bg-[#0d0d0d] z-10">
               <tr className="border-b border-[#222]">
-                <th className="py-3 px-4 text-xs font-extrabold text-gray-400 uppercase tracking-wider">Size</th>
-                <th className="py-3 px-4 text-xs font-extrabold text-gray-400 uppercase tracking-wider">Length</th>
-                <th className="py-3 px-4 text-xs font-extrabold text-gray-400 uppercase tracking-wider">Width</th>
-                <th className="py-3 px-4 text-xs font-extrabold text-[#00AEEF] uppercase tracking-wider">
-                  Height & Weight
+                <th className="py-3 px-4 text-xs font-extrabold text-gray-400 uppercase tracking-wider">
+                  {activeTab === 'kids' ? 'Age (Size)' : 'Size'}
                 </th>
+                <th className="py-3 px-4 text-xs font-extrabold text-gray-400 uppercase tracking-wider">Length</th>
+                <th className="py-3 px-4 text-xs font-extrabold text-gray-400 uppercase tracking-wider">
+                  {activeTab === 'kids' ? 'Chest' : 'Width'}
+                </th>
+                {/* إخفاء خانة الطول والوزن للأطفال بناءً على الصورة */}
+                {activeTab !== 'kids' && (
+                  <th className="py-3 px-4 text-xs font-extrabold text-[#00AEEF] uppercase tracking-wider">
+                    Height & Weight
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody className="divide-y divide-[#1f1f1f]">
-              {currentData.map((row) => (
+            {currentData.map((row: any) => (
                 <tr key={row.size} className="hover:bg-[#161616] transition duration-200">
                   <td className="py-4 px-4">
-                    <span className="w-8 h-8 flex items-center justify-center bg-[#1a1a1a] border border-[#333] rounded-lg font-black text-white text-sm">
+                    <span className="min-w-[2rem] px-2 h-8 inline-flex items-center justify-center bg-[#1a1a1a] border border-[#333] rounded-lg font-black text-white text-sm">
                       {row.size}
                     </span>
                   </td>
                   <td className="py-4 px-4 text-sm font-bold text-gray-300">{row.length}</td>
                   <td className="py-4 px-4 text-sm font-bold text-gray-300">{row.width}</td>
-                  <td className="py-4 px-4">
-                    <div className="flex flex-col text-sm font-bold">
-                      <span className="text-white">{row.height}</span>
-                      <span className="text-gray-500 text-xs mt-0.5">{row.weight}</span>
-                    </div>
-                  </td>
+                  {activeTab !== 'kids' && (
+                    <td className="py-4 px-4">
+                      <div className="flex flex-col text-sm font-bold">
+                        <span className="text-white">{row.height}</span>
+                        <span className="text-gray-500 text-xs mt-0.5">{row.weight}</span>
+                      </div>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
 
-        {/* ملاحظة سفلية ديناميكية تتغير حسب نوع التيشيرت */}
+        {/* ملاحظة سفلية ذكية */}
         <div className="p-4 bg-[#121212] border-t border-[#222] flex items-start gap-3">
           <Info className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
           <p className="text-xs text-gray-400 leading-relaxed font-medium">
             <strong className="text-white">Fit Advice: </strong> 
             {activeTab === 'player' 
-              ? 'Player version kits feature an athletic, slim fit designed for performance. If you prefer a looser fit, we highly recommend choosing one size larger than your usual standard size.' 
-              : 'Fan version kits feature a standard, relaxed fit designed for everyday comfort. You can comfortably choose your regular size.'}
+              ? 'Player version kits feature an athletic, slim fit designed for performance. We highly recommend choosing one size larger.' 
+              : activeTab === 'fan'
+              ? 'Fan version kits feature a standard, relaxed fit. You can comfortably choose your regular size.'
+              : 'Kids sizes are based on average age groups. If the child is taller than average, consider choosing the next age bracket up.'}
           </p>
         </div>
 

@@ -1,125 +1,165 @@
 "use client";
 
 import { useState, useEffect } from 'react';
-import { X, Tag, Sparkles, Copy, CheckCircle2, ShoppingBag } from 'lucide-react';
-import Link from 'next/link';
+import { supabase } from '@/lib/supabase';
+// تم إضافة Tag هنا 👇
+import { X, Sparkles, Copy, Check, ShoppingBag, Tag } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
 export default function PromoPopup() {
   const [isOpen, setIsOpen] = useState(false);
+  const [settings, setSettings] = useState<any>(null);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const router = useRouter();
 
   useEffect(() => {
-    // التأكد من عدم إزعاج الزبون (تظهر مرة واحدة فقط في الجلسة)
-    const hasSeenPromo = sessionStorage.getItem('promo_popup_seen');
-    
-    if (!hasSeenPromo) {
-      // تأخير الظهور لمدة 3 ثوانٍ حتى يكتمل تحميل الصفحة
-      const timer = setTimeout(() => {
-        setIsOpen(true);
-        sessionStorage.setItem('promo_popup_seen', 'true');
-      }, 3000);
-      return () => clearTimeout(timer);
+    async function fetchPopupSettings() {
+      try {
+        const { data, error } = await supabase
+          .from('popup_settings')
+          .select('*')
+          .eq('id', 1)
+          .single();
+
+        if (error || !data || !data.is_active) return;
+
+        // --- نظام التحكم بمرات الظهور (Show Frequency) ---
+        const frequency = data.show_frequency || 'once_per_session';
+        const today = new Date().toDateString();
+
+        if (frequency === 'once_per_session') {
+          if (sessionStorage.getItem('popup_shown_session')) return;
+        } else if (frequency === 'once_per_day') {
+          if (localStorage.getItem('popup_shown_date') === today) return;
+        }
+
+        setSettings(data);
+
+        // تأخير الظهور حسب الثواني المحددة في الأدمن
+        const delay = (data.delay_seconds || 0) * 1000;
+        setTimeout(() => {
+          setIsOpen(true);
+        }, Math.max(delay, 500)); 
+
+      } catch (err) {
+        console.error('Error fetching popup settings:', err);
+      }
     }
+
+    fetchPopupSettings();
   }, []);
+
+  const handleClose = () => {
+    setIsOpen(false);
+    if (!settings) return;
+
+    // تسجيل أن العميل قد رأى البوب أب
+    const frequency = settings.show_frequency || 'once_per_session';
+    if (frequency === 'once_per_session') {
+      sessionStorage.setItem('popup_shown_session', 'true');
+    } else if (frequency === 'once_per_day') {
+      localStorage.setItem('popup_shown_date', new Date().toDateString());
+    }
+  };
 
   const handleCopyCode = (code: string) => {
     navigator.clipboard.writeText(code);
     setCopiedCode(code);
-    setTimeout(() => setCopiedCode(null), 2500); // إخفاء علامة "تم النسخ" بعد ثانيتين ونصف
+    setTimeout(() => setCopiedCode(null), 2000); 
   };
 
-  if (!isOpen) return null;
+  const handleButtonClick = () => {
+    handleClose();
+    if (settings.button_link) {
+      router.push(settings.button_link);
+    }
+  };
+
+  if (!isOpen || !settings) return null;
+
+  // التأكد من أن البروموهات موجودة ومحفوظة
+  const promos = Array.isArray(settings.promos) ? settings.promos : [];
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-      {/* الخلفية المظلمة (Overlay) */}
+    <div className="fixed inset-0 z-[150] flex items-center justify-center p-4">
+      {/* الخلفية المظلمة */}
       <div 
-        className="absolute inset-0 bg-black/80 backdrop-blur-sm transition-opacity"
-        onClick={() => setIsOpen(false)}
+        className="absolute inset-0 bg-black/80 backdrop-blur-sm transition-opacity animate-in fade-in duration-300"
+        onClick={handleClose}
       />
 
-      {/* صندوق الـ Pop-up */}
-      <div className="relative w-full max-w-md bg-[#0d0d0d] border border-[#222] rounded-3xl shadow-[0_0_40px_rgba(0,174,239,0.15)] overflow-hidden animate-in fade-in zoom-in duration-300">
+      {/* صندوق البوب أب */}
+      <div className="relative w-full max-w-[380px] bg-[#0d0d0d] border border-[#1f1f1f] rounded-[2rem] shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-300 p-6 md:p-8">
         
         {/* زر الإغلاق */}
         <button 
-          onClick={() => setIsOpen(false)}
-          className="absolute top-4 right-4 p-1.5 bg-[#1a1a1a] text-gray-400 hover:text-white rounded-full transition z-10"
+          onClick={handleClose}
+          className="absolute top-4 right-4 text-gray-500 hover:text-white p-2 bg-[#1a1a1a] hover:bg-[#222] rounded-full transition z-10"
         >
-          <X className="w-5 h-5" />
+          <X className="w-4 h-4" />
         </button>
-
-        {/* الترويسة الجذابة */}
-        <div className="bg-gradient-to-br from-[#00AEEF]/20 to-transparent p-6 text-center border-b border-[#222]">
-          <div className="w-12 h-12 bg-[#00AEEF]/10 rounded-full flex items-center justify-center mx-auto mb-3 border border-[#00AEEF]/30">
-            <Sparkles className="w-6 h-6 text-[#00AEEF]" />
+        
+        {/* الترويسة الأنيقة */}
+        <div className="flex flex-col items-center mb-6">
+          <div className="w-14 h-14 rounded-full border border-[#222] flex items-center justify-center mb-5 bg-[#121212] shadow-inner">
+            <Sparkles className="text-[#00AEEF] w-7 h-7" />
           </div>
-          <h2 className="text-2xl font-black text-white uppercase tracking-tight">Unlock Special Deals!</h2>
-          <p className="text-sm text-gray-400 mt-1">Claim your exclusive offers before they expire.</p>
-        </div>
-
-        {/* العروض (Promo Codes) */}
-        <div className="p-6 space-y-4">
-          
-          {/* العرض الأول: WEEK1 */}
-          <div className="bg-[#161616] border border-[#2b2b2b] rounded-2xl p-4 flex flex-col gap-3 relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-16 h-16 bg-blue-500/5 rounded-bl-full" />
-            <div>
-              <h3 className="font-extrabold text-white text-base">Buy 1, Get 1 <span className="text-[#00AEEF]">50% OFF</span></h3>
-              <p className="text-xs text-gray-400 mt-0.5">Valid on all 26/27 Regular Season Kits.</p>
-            </div>
-            <button 
-              onClick={() => handleCopyCode('WEEK1')}
-              className={`flex items-center justify-between px-4 py-2.5 rounded-xl border transition font-bold text-sm ${copiedCode === 'WEEK1' ? 'bg-green-950/40 border-green-500/50 text-green-400' : 'bg-[#1a1a1a] border-[#333] text-white hover:border-[#00AEEF] hover:bg-[#00AEEF]/10'}`}
-            >
-              <span className="tracking-widest flex items-center gap-2">
-                <Tag className="w-4 h-4 text-gray-500" /> WEEK1
-              </span>
-              {copiedCode === 'WEEK1' ? (
-                <span className="flex items-center gap-1 text-xs"><CheckCircle2 className="w-3.5 h-3.5" /> Copied!</span>
-              ) : (
-                <span className="flex items-center gap-1 text-xs text-gray-400"><Copy className="w-3.5 h-3.5" /> Copy</span>
-              )}
-            </button>
-          </div>
-
-          {/* العرض الثاني: SHOES1 */}
-          <div className="bg-[#161616] border border-[#2b2b2b] rounded-2xl p-4 flex flex-col gap-3 relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-16 h-16 bg-amber-500/5 rounded-bl-full" />
-            <div>
-              <h3 className="font-extrabold text-white text-base">Free Kit with <span className="text-amber-400">Boots</span></h3>
-              <p className="text-xs text-gray-400 mt-0.5">Buy any boots and get a Regular Kit for 100% FREE.</p>
-            </div>
-            <button 
-              onClick={() => handleCopyCode('SHOES1')}
-              className={`flex items-center justify-between px-4 py-2.5 rounded-xl border transition font-bold text-sm ${copiedCode === 'SHOES1' ? 'bg-green-950/40 border-green-500/50 text-green-400' : 'bg-[#1a1a1a] border-[#333] text-white hover:border-amber-500/50 hover:bg-amber-500/10'}`}
-            >
-              <span className="tracking-widest flex items-center gap-2">
-                <Tag className="w-4 h-4 text-gray-500" /> SHOES1
-              </span>
-              {copiedCode === 'SHOES1' ? (
-                <span className="flex items-center gap-1 text-xs"><CheckCircle2 className="w-3.5 h-3.5" /> Copied!</span>
-              ) : (
-                <span className="flex items-center gap-1 text-xs text-gray-400"><Copy className="w-3.5 h-3.5" /> Copy</span>
-              )}
-            </button>
-          </div>
-
-        </div>
-
-        {/* تذييل النافذة وزر التسوق */}
-        <div className="p-6 pt-0">
-          <Link 
-            href="/catalog"
-            onClick={() => setIsOpen(false)}
-            className="w-full bg-[#00AEEF] hover:bg-blue-500 text-white font-extrabold py-3.5 rounded-xl transition shadow-[0_0_15px_rgba(0,174,239,0.3)] text-sm flex items-center justify-center gap-2"
-          >
-            <ShoppingBag className="w-4 h-4" /> Start Shopping Now
-          </Link>
-          <p className="text-center text-[10px] text-gray-500 mt-3 font-medium">
-            Enter the promo code at checkout. Only one code per order.
+          <h2 className="text-xl md:text-2xl font-black uppercase text-center text-white mb-2 leading-tight">
+            {settings.title}
+          </h2>
+          <p className="text-sm text-gray-400 text-center px-2 leading-relaxed">
+            {settings.description}
           </p>
         </div>
+
+        {/* قائمة العروض (البروموكودات) */}
+        <div className="space-y-4 mb-6 max-h-[40vh] overflow-y-auto pr-1 custom-scrollbar">
+          {promos.map((promo: any, idx: number) => (
+            <div key={idx} className="bg-[#121212] border border-[#222] rounded-2xl p-5 hover:border-[#333] transition">
+              <h3 className="font-bold text-white text-[15px] mb-1">
+                {promo.title}
+              </h3>
+              <p className="text-xs text-gray-400 mb-4 leading-relaxed">
+                {promo.subtitle}
+              </p>
+              
+              <div className="flex items-center justify-between bg-[#1a1a1a] border border-[#333] rounded-xl px-4 py-3 group">
+                <div className="flex items-center gap-2 text-[#00AEEF] font-bold tracking-widest text-sm font-mono">
+                  <Tag className="w-4 h-4 text-gray-500" /> {promo.code}
+                </div>
+                <button 
+                  onClick={() => handleCopyCode(promo.code)}
+                  className={`flex items-center gap-1.5 text-xs font-bold transition px-3 py-1.5 rounded-lg border ${
+                    copiedCode === promo.code 
+                      ? 'bg-green-950/50 text-green-400 border-green-500/30' 
+                      : 'bg-[#222] text-gray-300 hover:text-white border-[#444] hover:bg-[#333]'
+                  }`}
+                >
+                  {copiedCode === promo.code ? (
+                    <><Check className="w-3.5 h-3.5" /> Copied</>
+                  ) : (
+                    <><Copy className="w-3.5 h-3.5" /> Copy</>
+                  )}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* الزر الرئيسي */}
+        <button 
+          onClick={handleButtonClick}
+          className="w-full bg-[#005c8a] hover:bg-[#007bb5] text-white font-extrabold py-4 rounded-xl flex items-center justify-center gap-2 text-sm shadow-[0_0_20px_rgba(0,174,239,0.2)] transition duration-300"
+        >
+          <ShoppingBag className="w-4 h-4" /> {settings.button_text || 'SHOP NOW'}
+        </button>
+        
+        {/* ملاحظة الفوتر */}
+        {settings.footer_text && (
+          <p className="text-[10px] text-gray-500 text-center mt-5 px-4">
+            {settings.footer_text}
+          </p>
+        )}
 
       </div>
     </div>

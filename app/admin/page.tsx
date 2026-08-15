@@ -20,9 +20,10 @@ import {
   PowerOff,
   Percent,
   Megaphone,
-  Image as ImageIcon,
   Eye,
-  EyeOff
+  EyeOff,
+  Sparkles,
+  Copy
 } from 'lucide-react';
 
 const STORE_CATEGORIES = ['Kits', 'Retro Kits', 'Kids', 'Special Orders', 'Boots', 'Equipment', 'Mystery Drop'];
@@ -48,9 +49,17 @@ export default function AdminDashboard() {
     code: '', description: '', discount_type: 'percentage', discount_value: 0, target_categories: [] as string[]
   });
 
-  // حالة إعدادات الـ Pop-up
+  // --- حالة إعدادات الـ Pop-up المحدثة (الذكية) ---
   const [popupSettings, setPopupSettings] = useState({
-    is_active: false, title: '', description: '', image_url: '', button_text: '', button_link: '', delay_seconds: 3
+    is_active: false, 
+    title: 'UNLOCK SPECIAL DEALS!', 
+    description: 'Claim your exclusive offers before they expire.', 
+    button_text: 'Start Shopping Now', 
+    button_link: '/catalog', 
+    delay_seconds: 3,
+    show_frequency: 'once_per_session', // always, once_per_session, once_per_day
+    footer_text: 'Enter the promo code at checkout. Only one code per order.',
+    promos: [] as { title: string, subtitle: string, code: string }[]
   });
 
   const fetchData = async () => {
@@ -68,7 +77,13 @@ export default function AdminDashboard() {
     if (promoData) setPromos(promoData);
 
     const { data: popupData } = await supabase.from('popup_settings').select('*').eq('id', 1).single();
-    if (popupData) setPopupSettings(popupData);
+    if (popupData) {
+      setPopupSettings({
+        ...popupSettings,
+        ...popupData,
+        promos: popupData.promos || []
+      });
+    }
 
     setLoading(false);
   };
@@ -83,13 +98,10 @@ export default function AdminDashboard() {
       title: newProduct.title, price: parseFloat(newProduct.price), category: newProduct.category, league: newProduct.league,
       image_url: newProduct.imageUrl || 'https://images.unsplash.com/photo-1583318433420-532155e9d9e4?q=80&w=500',
       image_urls: newProduct.imageUrl ? [newProduct.imageUrl] : [], loyalty_points_earned: Number(newProduct.loyalty_points_earned) || 20,
-      in_stock: true // متوفر افتراضياً عند الإضافة
+      in_stock: true
     }]);
-    if (!error) {
-      alert("✅ تم إضافة المنتج بنجاح!");
-      setNewProduct({ title: '', price: '', category: 'Kits', league: 'Premier League', imageUrl: '', loyalty_points_earned: 20 });
-      fetchData();
-    } else alert("🚨 خطأ أثناء الإضافة: " + error.message);
+    if (!error) { alert("✅ تم إضافة المنتج بنجاح!"); setNewProduct({ title: '', price: '', category: 'Kits', league: 'Premier League', imageUrl: '', loyalty_points_earned: 20 }); fetchData(); } 
+    else alert("🚨 خطأ أثناء الإضافة: " + error.message);
   };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -139,10 +151,8 @@ export default function AdminDashboard() {
     await supabase.from('products').delete().eq('id', id); fetchData();
   };
 
-  // --- تبديل حالة توفر المنتج ---
   const toggleProductAvailability = async (id: number, currentStatus: boolean) => {
-    await supabase.from('products').update({ in_stock: !currentStatus }).eq('id', id);
-    fetchData();
+    await supabase.from('products').update({ in_stock: !currentStatus }).eq('id', id); fetchData();
   };
 
   // --- دوال الطلبات والولاء ---
@@ -194,7 +204,25 @@ export default function AdminDashboard() {
     }
   };
 
-  // --- حفظ إعدادات الـ Pop-up ---
+  // --- دوال نافذة البوب أب التفاعلية ---
+  const handleAddPopupPromo = () => {
+    setPopupSettings({
+      ...popupSettings,
+      promos: [...popupSettings.promos, { title: 'New Offer', subtitle: 'Valid on specific items', code: 'NEWCODE' }]
+    });
+  };
+
+  const handleUpdatePopupPromo = (index: number, field: string, value: string) => {
+    const updatedPromos = [...popupSettings.promos];
+    updatedPromos[index] = { ...updatedPromos[index], [field]: value };
+    setPopupSettings({ ...popupSettings, promos: updatedPromos });
+  };
+
+  const handleRemovePopupPromo = (index: number) => {
+    const updatedPromos = popupSettings.promos.filter((_, i) => i !== index);
+    setPopupSettings({ ...popupSettings, promos: updatedPromos });
+  };
+
   const handleSavePopupSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     const { error } = await supabase.from('popup_settings').upsert([{ id: 1, ...popupSettings }]);
@@ -218,7 +246,7 @@ export default function AdminDashboard() {
             <button onClick={() => setActiveTab('products')} className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition ${activeTab === 'products' ? 'bg-[#00AEEF] text-white' : 'text-gray-400 hover:text-white'}`}><Package className="w-4 h-4" /> Products</button>
             <button onClick={() => setActiveTab('orders')} className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition ${activeTab === 'orders' ? 'bg-[#00AEEF] text-white' : 'text-gray-400 hover:text-white'}`}><ShoppingBag className="w-4 h-4" /> Orders</button>
             <button onClick={() => setActiveTab('promos')} className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition ${activeTab === 'promos' ? 'bg-[#00AEEF] text-white' : 'text-gray-400 hover:text-white'}`}><Tag className="w-4 h-4" /> Promos</button>
-            <button onClick={() => setActiveTab('popup')} className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition ${activeTab === 'popup' ? 'bg-[#00AEEF] text-white' : 'text-gray-400 hover:text-white'}`}><Megaphone className="w-4 h-4" /> Popup</button>
+            <button onClick={() => setActiveTab('popup')} className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition ${activeTab === 'popup' ? 'bg-[#00AEEF] text-white' : 'text-gray-400 hover:text-white'}`}><Megaphone className="w-4 h-4" /> Popup Builder</button>
             <button onClick={() => setActiveTab('loyalty')} className={`px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition ${activeTab === 'loyalty' ? 'bg-[#00AEEF] text-white' : 'text-gray-400 hover:text-white'}`}><Award className="w-4 h-4" /> Loyalty</button>
           </div>
         </div>
@@ -227,6 +255,7 @@ export default function AdminDashboard() {
           <div className="text-center py-20 text-gray-400">Loading Dashboard Data...</div>
         ) : (
           <>
+            {/* ======================================================== */}
             {/* 1. تبويب المنتجات والإكسل */}
             {activeTab === 'products' && (
               <div className="space-y-8">
@@ -252,7 +281,7 @@ export default function AdminDashboard() {
 
                   <div className="bg-[#121212] p-6 rounded-2xl border border-[#1f1f1f] flex flex-col justify-center items-center text-center">
                     <h2 className="text-xl font-bold mb-2 flex items-center gap-2"><Upload className="w-5 h-5 text-[#00AEEF]" /> Bulk Upload via Excel</h2>
-                    <p className="text-gray-400 text-xs mb-6 max-w-sm leading-relaxed">Upload an Excel (.xlsx) or CSV file. Columns must include:<br/> <strong className="text-white">Title, Price, Category, League, ImageUrl, Points</strong></p>
+                    <p className="text-gray-400 text-xs mb-6 max-w-sm leading-relaxed">Upload an Excel (.xlsx) or CSV file. Columns must include:<br/> <strong className="text-white">Title, Price, Category, League, ImageUrl, Points, InStock</strong></p>
                     <input type="file" accept=".xlsx, .xls, .csv" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
                     <button onClick={() => fileInputRef.current?.click()} disabled={isUploading} className={`w-full py-5 border-2 border-dashed rounded-2xl font-bold transition flex items-center justify-center gap-3 ${isUploading ? 'border-gray-600 text-gray-500' : 'border-[#00AEEF] text-[#00AEEF] hover:bg-[#00AEEF]/10'}`}>
                       {isUploading ? <>Processing File...</> : <><Upload className="w-5 h-5" /> Select Excel File</>}
@@ -268,7 +297,6 @@ export default function AdminDashboard() {
                   <div className="divide-y divide-[#1f1f1f] max-h-[600px] overflow-y-auto">
                     {products.map((p) => {
                       const img = Array.isArray(p.image_urls) && p.image_urls.length > 0 ? p.image_urls[0] : p.imageUrl || p.image_url;
-                      // التحقق من حالة التوفر
                       const isAvailable = p.in_stock !== false; 
                       return (
                         <div key={p.id} className={`p-4 flex items-center justify-between gap-4 transition ${!isAvailable ? 'bg-[#1a0505] opacity-70' : 'hover:bg-[#161616]'}`}>
@@ -287,11 +315,9 @@ export default function AdminDashboard() {
                           <div className="flex items-center gap-4">
                             <span className={`font-black text-lg ${!isAvailable ? 'text-gray-500' : 'text-white'}`}>${p.price}</span>
                             <div className="flex items-center gap-2">
-                              {/* زر الإخفاء/الإظهار (التوفر) */}
                               <button onClick={() => toggleProductAvailability(p.id, isAvailable)} className={`p-2 rounded-lg transition ${isAvailable ? 'bg-[#1f1f1f] hover:bg-yellow-600 text-gray-300 hover:text-white' : 'bg-red-900 hover:bg-green-600 text-red-300 hover:text-white'}`} title={isAvailable ? "Mark Out of Stock" : "Mark In Stock"}>
                                 {isAvailable ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                               </button>
-                              
                               <button onClick={() => setEditingProduct({ ...p, imageUrl: img })} className="p-2 bg-[#1f1f1f] hover:bg-[#00AEEF] text-gray-300 hover:text-white rounded-lg transition" title="Edit"><Edit3 className="w-4 h-4" /></button>
                               <button onClick={() => handleDeleteProduct(p.id)} className="p-2 bg-[#1f1f1f] hover:bg-red-600 text-gray-300 hover:text-white rounded-lg transition" title="Delete"><Trash2 className="w-4 h-4" /></button>
                             </div>
@@ -309,15 +335,10 @@ export default function AdminDashboard() {
                <div className="bg-[#121212] rounded-2xl border border-[#1f1f1f] overflow-hidden">
                 <div className="p-6 border-b border-[#222] flex justify-between items-center">
                   <h3 className="font-bold text-lg">Customer Orders ({orders.length})</h3>
-                  <button onClick={fetchData} className="text-xs text-[#00AEEF] hover:underline flex items-center gap-1 font-bold">
-                    <RefreshCw className="w-3 h-3" /> Refresh Orders
-                  </button>
+                  <button onClick={fetchData} className="text-xs text-[#00AEEF] hover:underline flex items-center gap-1 font-bold"><RefreshCw className="w-3 h-3" /> Refresh Orders</button>
                 </div>
                 <div className="divide-y divide-[#1f1f1f]">
-                  {orders.length === 0 ? (
-                    <div className="p-12 text-center text-gray-400">No customer orders placed yet.</div>
-                  ) : (
-                    orders.map((order) => (
+                  {orders.length === 0 ? <div className="p-12 text-center text-gray-400">No customer orders placed yet.</div> : orders.map((order) => (
                       <div key={order.id} className="p-6 space-y-4 hover:bg-[#161616] transition">
                         <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2">
                           <div>
@@ -341,8 +362,7 @@ export default function AdminDashboard() {
                           <div className="border-t border-[#2d2d2d] pt-2 mt-2 flex justify-between items-center text-sm font-extrabold text-white"><span>Total Paid (COD):</span><span className="text-[#00AEEF]">${order.total_amount}</span></div>
                         </div>
                       </div>
-                    ))
-                  )}
+                    ))}
                 </div>
                </div>
             )}
@@ -399,7 +419,7 @@ export default function AdminDashboard() {
                           <div className="flex items-center gap-3">
                             <span className={`text-[10px] font-extrabold uppercase px-3 py-1.5 rounded-full border ${promo.is_active ? 'bg-green-950/40 text-green-400 border-green-500/30' : 'bg-red-950/40 text-red-400 border-red-500/30'}`}>{promo.is_active ? 'Active' : 'Disabled'}</span>
                             <button onClick={() => togglePromoStatus(promo.id, promo.is_active)} className={`p-2.5 rounded-xl transition ${promo.is_active ? 'bg-[#1a1a1a] hover:bg-yellow-600 text-gray-300 border border-[#333]' : 'bg-[#1a1a1a] hover:bg-green-600 text-gray-300 border border-[#333]'}`}>{promo.is_active ? <PowerOff className="w-5 h-5" /> : <Power className="w-5 h-5" />}</button>
-                            <button onClick={() => handleDeletePromo(promo.id)} className="p-2.5 bg-[#1a1a1a] border border-[#333] hover:bg-red-600 text-gray-300 hover:text-white rounded-xl transition"><Trash2 className="w-5 h-5" /></button>
+                            <button onClick={() => handleDeletePromo(promo.id)} className="p-2.5 bg-[#1a1a1a] border border-[#333] hover:bg-red-600 rounded-xl"><Trash2 className="w-5 h-5" /></button>
                           </div>
                         </div>
                       ))}
@@ -408,40 +428,110 @@ export default function AdminDashboard() {
               </div>
             )}
 
-            {/* 4. تبويب الـ Popup (الجديد والمميز) */}
+            {/* ======================================================== */}
+            {/* 4. تبويب الـ Popup Builder (متعدد العروض - مطابق لصورتك!) */}
+            {/* ======================================================== */}
             {activeTab === 'popup' && (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fadeIn">
+                
+                {/* لوحة التحكم */}
                 <form onSubmit={handleSavePopupSettings} className="bg-[#121212] p-6 md:p-8 rounded-2xl border border-[#1f1f1f] shadow-xl space-y-6">
                   <div className="flex items-center justify-between border-b border-[#222] pb-4">
-                    <h3 className="font-bold text-xl flex items-center gap-2"><Megaphone className="w-6 h-6 text-[#00AEEF]" /> Global Popup Settings</h3>
-                    <button type="button" onClick={() => setPopupSettings({ ...popupSettings, is_active: !popupSettings.is_active })} className={`relative w-16 h-8 rounded-full transition-colors duration-300 focus:outline-none ${popupSettings.is_active ? 'bg-green-500' : 'bg-[#333]'}`}>
-                      <div className={`absolute top-1 left-1 bg-white w-6 h-6 rounded-full transition-transform duration-300 shadow-sm flex items-center justify-center ${popupSettings.is_active ? 'translate-x-8' : ''}`}>{popupSettings.is_active && <Power className="w-3 h-3 text-green-500" />}</div>
+                    <h3 className="font-bold text-xl flex items-center gap-2"><Megaphone className="w-6 h-6 text-[#00AEEF]" /> Global Popup Builder</h3>
+                    <button type="button" onClick={() => setPopupSettings({ ...popupSettings, is_active: !popupSettings.is_active })} className={`relative w-16 h-8 rounded-full transition-colors duration-300 focus:outline-none ${popupSettings.is_active ? 'bg-[#00AEEF]' : 'bg-[#333]'}`}>
+                      <div className={`absolute top-1 left-1 bg-white w-6 h-6 rounded-full transition-transform duration-300 shadow-sm flex items-center justify-center ${popupSettings.is_active ? 'translate-x-8' : ''}`}>{popupSettings.is_active && <Power className="w-3 h-3 text-[#00AEEF]" />}</div>
                     </button>
                   </div>
-                  <div className="space-y-4">
-                    <div><label className="block text-sm font-bold text-gray-300 mb-1">Headline (Title)</label><input type="text" value={popupSettings.title} onChange={(e) => setPopupSettings({ ...popupSettings, title: e.target.value })} placeholder="e.g. FLASH SALE!" className="w-full bg-[#1a1a1a] border border-[#333] rounded-xl p-3 text-white focus:border-[#00AEEF] uppercase font-black tracking-wider" /></div>
-                    <div><label className="block text-sm font-bold text-gray-300 mb-1">Subtext (Description)</label><textarea rows={3} value={popupSettings.description} onChange={(e) => setPopupSettings({ ...popupSettings, description: e.target.value })} placeholder="e.g. Use code WEEK1 to get 50% off." className="w-full bg-[#1a1a1a] border border-[#333] rounded-xl p-3 text-white focus:border-[#00AEEF]" /></div>
-                    <div><label className="block text-sm font-bold text-gray-300 mb-1 flex items-center gap-1"><ImageIcon className="w-4 h-4"/> Optional Image URL</label><input type="url" value={popupSettings.image_url} onChange={(e) => setPopupSettings({ ...popupSettings, image_url: e.target.value })} placeholder="https://..." className="w-full bg-[#1a1a1a] border border-[#333] rounded-xl p-3 text-white focus:border-[#00AEEF]" /></div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div><label className="block text-sm font-bold text-gray-300 mb-1">Button Text</label><input type="text" value={popupSettings.button_text} onChange={(e) => setPopupSettings({ ...popupSettings, button_text: e.target.value })} placeholder="SHOP NOW" className="w-full bg-[#1a1a1a] border border-[#333] rounded-xl p-3 text-white focus:border-[#00AEEF] uppercase font-bold" /></div>
-                      <div><label className="block text-sm font-bold text-gray-300 mb-1">Button Link</label><input type="text" value={popupSettings.button_link} onChange={(e) => setPopupSettings({ ...popupSettings, button_link: e.target.value })} placeholder="/catalog" className="w-full bg-[#1a1a1a] border border-[#333] rounded-xl p-3 text-white focus:border-[#00AEEF]" /></div>
+
+                  <div className="space-y-6">
+                    {/* الإعدادات الأساسية للنافذة */}
+                    <div className="space-y-4 bg-[#161616] p-5 rounded-xl border border-[#222]">
+                      <div><label className="block text-xs font-bold text-gray-400 mb-1">Headline (Title)</label><input type="text" value={popupSettings.title} onChange={(e) => setPopupSettings({ ...popupSettings, title: e.target.value })} className="w-full bg-[#1a1a1a] border border-[#333] rounded-xl p-3 text-white focus:border-[#00AEEF] uppercase font-black" /></div>
+                      <div><label className="block text-xs font-bold text-gray-400 mb-1">Subtext (Description)</label><input type="text" value={popupSettings.description} onChange={(e) => setPopupSettings({ ...popupSettings, description: e.target.value })} className="w-full bg-[#1a1a1a] border border-[#333] rounded-xl p-3 text-white focus:border-[#00AEEF]" /></div>
+                      
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-bold text-gray-400 mb-1">Show Frequency</label>
+                          <select value={popupSettings.show_frequency} onChange={(e) => setPopupSettings({ ...popupSettings, show_frequency: e.target.value })} className="w-full bg-[#1a1a1a] border border-[#333] rounded-xl p-3 text-white text-sm focus:border-[#00AEEF]">
+                            <option value="always">Always Show</option>
+                            <option value="once_per_session">Once per visit (Session)</option>
+                            <option value="once_per_day">Once every 24 hours</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-xs font-bold text-gray-400 mb-1">Delay (Seconds)</label>
+                          <input type="number" min="0" value={popupSettings.delay_seconds} onChange={(e) => setPopupSettings({ ...popupSettings, delay_seconds: Number(e.target.value) })} className="w-full bg-[#1a1a1a] border border-[#333] rounded-xl p-3 text-white focus:border-[#00AEEF]" />
+                        </div>
+                      </div>
                     </div>
-                    <div><label className="block text-sm font-bold text-gray-300 mb-1">Delay before showing (Seconds)</label><input type="number" min="0" value={popupSettings.delay_seconds} onChange={(e) => setPopupSettings({ ...popupSettings, delay_seconds: Number(e.target.value) })} className="w-full bg-[#1a1a1a] border border-[#333] rounded-xl p-3 text-white focus:border-[#00AEEF]" /></div>
+
+                    {/* إدارة العروض (البروموهات داخل البوب أب) */}
+                    <div className="space-y-3 border-t border-[#222] pt-4">
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-bold text-sm text-gray-300">Promo Code Blocks</h4>
+                        <button type="button" onClick={handleAddPopupPromo} className="text-[#00AEEF] text-xs font-bold flex items-center gap-1 hover:underline"><Plus className="w-3 h-3"/> Add Promo</button>
+                      </div>
+                      
+                      {popupSettings.promos.map((promo, index) => (
+                        <div key={index} className="bg-[#1a1a1a] p-4 rounded-xl border border-[#333] relative">
+                          <button type="button" onClick={() => handleRemovePopupPromo(index)} className="absolute top-2 right-2 text-gray-500 hover:text-red-500"><X className="w-4 h-4" /></button>
+                          <div className="space-y-3 mt-2">
+                            <input type="text" value={promo.title} onChange={(e) => handleUpdatePopupPromo(index, 'title', e.target.value)} placeholder="Title (e.g. Buy 1, Get 1 50% OFF)" className="w-full bg-[#121212] border border-[#222] rounded-lg p-2 text-xs text-white" />
+                            <input type="text" value={promo.subtitle} onChange={(e) => handleUpdatePopupPromo(index, 'subtitle', e.target.value)} placeholder="Subtitle (e.g. Valid on all kits)" className="w-full bg-[#121212] border border-[#222] rounded-lg p-2 text-xs text-white" />
+                            <input type="text" value={promo.code} onChange={(e) => handleUpdatePopupPromo(index, 'code', e.target.value.toUpperCase())} placeholder="PROMO CODE" className="w-full bg-[#121212] border border-[#222] rounded-lg p-2 text-xs font-mono tracking-widest text-[#00AEEF]" />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* الزر والفوتر */}
+                    <div className="grid grid-cols-2 gap-4 border-t border-[#222] pt-4">
+                      <div><label className="block text-xs font-bold text-gray-400 mb-1">Button Text</label><input type="text" value={popupSettings.button_text} onChange={(e) => setPopupSettings({ ...popupSettings, button_text: e.target.value })} className="w-full bg-[#1a1a1a] border border-[#333] rounded-xl p-3 text-white focus:border-[#00AEEF] font-bold text-sm" /></div>
+                      <div><label className="block text-xs font-bold text-gray-400 mb-1">Button Link</label><input type="text" value={popupSettings.button_link} onChange={(e) => setPopupSettings({ ...popupSettings, button_link: e.target.value })} className="w-full bg-[#1a1a1a] border border-[#333] rounded-xl p-3 text-white focus:border-[#00AEEF] text-sm" /></div>
+                    </div>
+                    <div><label className="block text-xs font-bold text-gray-400 mb-1">Footer Note</label><input type="text" value={popupSettings.footer_text} onChange={(e) => setPopupSettings({ ...popupSettings, footer_text: e.target.value })} className="w-full bg-[#1a1a1a] border border-[#333] rounded-xl p-3 text-white focus:border-[#00AEEF] text-xs" /></div>
                   </div>
+
                   <button type="submit" className="w-full bg-[#00AEEF] hover:bg-blue-500 text-white font-extrabold py-4 rounded-xl transition shadow-lg text-lg">Save Popup Settings</button>
                 </form>
 
-                {/* المعاينة الحية */}
+                {/* المعاينة الحية (Live Preview) - مطابقة لتصميمك الرائع */}
                 <div className="hidden lg:flex flex-col items-center justify-center p-8 bg-[#0a0a0a] border-2 border-dashed border-[#222] rounded-2xl relative">
                   <div className="absolute top-4 left-4 text-xs font-bold text-gray-500 uppercase flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span> Live Preview</div>
-                  <div className={`relative w-full max-w-sm bg-[#121212] border border-[#333] rounded-2xl overflow-hidden shadow-2xl transition-all duration-500 ${!popupSettings.is_active ? 'opacity-40 grayscale' : 'opacity-100 scale-105'}`}>
-                    <button disabled className="absolute top-3 right-3 text-gray-400 hover:text-white p-1 bg-black/50 rounded-full z-10"><X className="w-4 h-4" /></button>
-                    {popupSettings.image_url && <div className="h-40 w-full overflow-hidden"><img src={popupSettings.image_url} alt="Popup" className="w-full h-full object-cover" /></div>}
-                    <div className="p-8 text-center space-y-4">
-                      <h2 className="text-2xl font-black uppercase tracking-tight text-[#00AEEF] leading-tight">{popupSettings.title || 'YOUR TITLE HERE'}</h2>
-                      <p className="text-sm text-gray-300 leading-relaxed">{popupSettings.description || 'Your exciting offer description goes right here so customers can read it.'}</p>
-                      <div className="pt-2"><button disabled className="w-full bg-[#00AEEF] text-white font-extrabold py-3.5 rounded-xl uppercase tracking-wide text-sm shadow-[0_0_15px_rgba(0,174,239,0.4)]">{popupSettings.button_text || 'CLICK HERE'}</button></div>
+                  
+                  <div className={`relative w-full max-w-[380px] bg-[#0d0d0d] border border-[#1f1f1f] rounded-3xl overflow-hidden shadow-2xl transition-all duration-500 p-6 ${!popupSettings.is_active ? 'opacity-40 grayscale scale-95' : 'opacity-100 scale-100'}`}>
+                    <button disabled className="absolute top-4 right-4 text-gray-400 hover:text-white p-1.5 bg-[#1a1a1a] rounded-full"><X className="w-4 h-4" /></button>
+                    
+                    <div className="flex flex-col items-center mb-6">
+                      <div className="w-12 h-12 rounded-full border border-[#222] flex items-center justify-center mb-4 bg-[#121212]">
+                        <Sparkles className="text-[#00AEEF] w-6 h-6" />
+                      </div>
+                      <h2 className="text-xl font-black uppercase text-center text-white mb-2 leading-tight">{popupSettings.title}</h2>
+                      <p className="text-sm text-gray-400 text-center">{popupSettings.description}</p>
                     </div>
+
+                    <div className="space-y-4 mb-6">
+                      {popupSettings.promos.map((promo, idx) => (
+                        <div key={idx} className="bg-[#121212] border border-[#222] rounded-2xl p-4">
+                          <h3 className="font-bold text-white text-[15px] mb-1">{promo.title}</h3>
+                          <p className="text-xs text-gray-400 mb-4">{promo.subtitle}</p>
+                          <div className="flex items-center justify-between bg-[#1a1a1a] border border-[#333] rounded-xl px-4 py-3">
+                            <div className="flex items-center gap-2 text-white font-bold tracking-widest text-sm">
+                              <Tag className="w-4 h-4 text-gray-500" /> {promo.code}
+                            </div>
+                            <button className="flex items-center gap-1.5 text-gray-400 hover:text-white text-xs font-bold transition">
+                              <Copy className="w-3.5 h-3.5" /> Copy
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <button disabled className="w-full bg-[#005c8a] text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 text-sm shadow-md">
+                      <ShoppingBag className="w-4 h-4" /> {popupSettings.button_text}
+                    </button>
+                    
+                    <p className="text-[10px] text-gray-500 text-center mt-4 px-4">{popupSettings.footer_text}</p>
                   </div>
                   {!popupSettings.is_active && <p className="text-red-400 text-xs font-bold mt-6">⚠️ Currently Disabled. Toggle the switch to activate.</p>}
                 </div>
@@ -488,14 +578,9 @@ export default function AdminDashboard() {
                 </div>
                 <input type="url" value={editingProduct.imageUrl || ''} onChange={(e) => setEditingProduct({ ...editingProduct, imageUrl: e.target.value })} className="w-full bg-[#1a1a1a] border border-[#333] rounded-lg p-3 text-white text-sm" />
                 
-                {/* مفتاح تبديل التوفر في نافذة التعديل */}
                 <div className="flex items-center justify-between bg-[#1a1a1a] p-3 rounded-lg border border-[#333]">
                   <span className="text-sm font-bold text-gray-300">Product Availability (In Stock)</span>
-                  <button 
-                    type="button" 
-                    onClick={() => setEditingProduct({ ...editingProduct, in_stock: !editingProduct.in_stock })}
-                    className={`relative w-12 h-6 rounded-full transition-colors duration-300 ${editingProduct.in_stock !== false ? 'bg-green-500' : 'bg-[#444]'}`}
-                  >
+                  <button type="button" onClick={() => setEditingProduct({ ...editingProduct, in_stock: !editingProduct.in_stock })} className={`relative w-12 h-6 rounded-full transition-colors duration-300 ${editingProduct.in_stock !== false ? 'bg-green-500' : 'bg-[#444]'}`}>
                     <div className={`absolute top-1 left-1 bg-white w-4 h-4 rounded-full transition-transform duration-300 ${editingProduct.in_stock !== false ? 'translate-x-6' : ''}`}></div>
                   </button>
                 </div>

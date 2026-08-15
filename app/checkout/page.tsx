@@ -11,7 +11,8 @@ import {
   Tag, 
   CheckCircle2, 
   AlertCircle, 
-  ArrowLeft 
+  ArrowLeft,
+  Loader2
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -33,6 +34,7 @@ export default function CheckoutPage() {
   const [discountAmount, setDiscountAmount] = useState(0);
   const [appliedVoucher, setAppliedVoucher] = useState<string | null>(null);
   const [voucherError, setVoucherError] = useState<string | null>(null);
+  const [isApplyingVoucher, setIsApplyingVoucher] = useState(false);
 
   // حالة التقديم
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -42,106 +44,121 @@ export default function CheckoutPage() {
   const shipping = 4.00;
   const total = Math.max(0, subtotal + shipping - discountAmount);
 
-  // التحقق مما إذا كان المنتج قميصاً عادياً (Kits / Regular Season)
-  const isRegularKitCategory = (category?: string) => {
-    if (!category) return true;
-    const cat = category.toLowerCase();
-    return (
-      cat === 'kits' ||
-      cat === 'home jerseys' ||
-      cat === 'away jerseys' ||
-      cat === 'third jerseys' ||
-      cat === 'jerseys'
-    );
-  };
-
-  // التحقق مما إذا كان المنتج حذاءً (Boots)
-  const isBootCategory = (category?: string) => {
-    if (!category) return false;
-    return category.toLowerCase().includes('boot');
-  };
-
-  // تطبيق أكواد الخصم والعروض الخاصة
-  const handleApplyVoucher = (e: React.FormEvent) => {
+  // --- النظام الذكي لتطبيق أكواد الخصم من قاعدة البيانات ---
+  const handleApplyVoucher = async (e: React.FormEvent) => {
     e.preventDefault();
     setVoucherError(null);
 
     const cleanCode = voucherCode.trim().toUpperCase();
     if (!cleanCode) return;
 
-    // 1. بروموكود WEEK1 (BOGO 50% OFF على القمصان العادية فقط)
-    if (cleanCode === 'WEEK1') {
-      const regularKitsPrices: number[] = [];
+    setIsApplyingVoucher(true);
 
+    try {
+      // 1. البحث عن الكود في قاعدة البيانات
+      const { data: promo, error } = await supabase
+        .from('promo_codes')
+        .select('*')
+        .eq('code', cleanCode)
+        .eq('is_active', true)
+        .single();
+
+      if (error || !promo) {
+        setVoucherError('❌ Invalid or expired promo code.');
+        setIsApplyingVoucher(false);
+        return;
+      }
+
+      // 2. تصفية المنتجات في السلة التي يشملها العرض وفك الكميات لقطع مفردة
+      let eligibleItems: { price: number; category: string; title: string }[] = [];
+      
       items.forEach((item: any) => {
-        if (isRegularKitCategory(item.category)) {
+        // التحقق مما إذا كان المنتج ينتمي للفئات المستهدفة بالبرومو (إذا كانت فارغة فهذا يعني أن العرض يشمل كل المتجر)
+        const isEligible = !promo.target_categories || promo.target_categories.length === 0 || promo.target_categories.includes(item.category);
+        
+        if (isEligible) {
           const qty = Number(item.quantity) || 1;
           const price = parseFloat(item.price) || 0;
+          // تفكيك الكمية (إذا كان يشتري 3 من نفس القميص، نجعلها 3 عناصر منفصلة لسهولة حساب عروض الـ BOGO)
           for (let i = 0; i < qty; i++) {
-            regularKitsPrices.push(price);
+            eligibleItems.push({ price, category: item.category, title: item.title });
           }
         }
       });
 
-      if (regularKitsPrices.length < 2) {
-        setVoucherError('⚠️ Promo code WEEK1 requires at least 2 Regular Season Kits in your bag.');
+      if (eligibleItems.length === 0) {
+        setVoucherError('⚠️ This promo code is not applicable to the items in your bag.');
+        setIsApplyingVoucher(false);
         return;
       }
 
-      regularKitsPrices.sort((a, b) => a - b);
-      const bogoDiscount = regularKitsPrices[0] * 0.5;
+      // ترتيب المنتجات المشمولة بالعرض من الأرخص إلى الأغلى (مهم جداً لعروض BOGO)
+      eligibleItems.sort((a, b) => a.price - b.price);
+      
+      // إجمالي سعر المنتجات المشمولة بالعرض فقط
+      const eligibleSubtotal = eligibleItems.reduce((sum, item) => sum + item.price, 0);
+      
+      let calculatedDiscount = 0;
 
-      setDiscountAmount(Number(bogoDiscount.toFixed(2)));
-      setAppliedVoucher('WEEK1 (BOGO 50% OFF)');
-      setVoucherCode('');
-      return;
-    }
-
-    // 2. بروموكود SHOES1 (اشتري حذاء Boots واحصل على تيشيرت Kits مجاناً)
-    if (cleanCode === 'SHOES1') {
-      let hasBoots = false;
-      const regularKitsPrices: number[] = [];
-
-      items.forEach((item: any) => {
-        if (isBootCategory(item.category)) {
-          hasBoots = true;
-        }
-
-        if (isRegularKitCategory(item.category)) {
-          const qty = Number(item.quantity) || 1;
-          const price = parseFloat(item.price) || 0;
-          for (let i = 0; i < qty; i++) {
-            regularKitsPrices.push(price);
+      // 3. حساب الخصم بناءً على نوع البرومو
+      switch (promo.discount_type) {
+        case 'percentage':
+          calculatedDiscount = eligibleSubtotal * (Number(promo.discount_value) / 100);
+          break;
+          
+        case 'fixed':
+          calculatedDiscount = Math.min(eligibleSubtotal, Number(promo.discount_value)); // الخصم لا يمكن أن يتجاوز قيمة المنتجات المشمولة
+          break;
+          
+        case 'bogo_50': // اشتر 1 واحصل على 2 بنصف السعر
+          if (eligibleItems.length < 2) {
+            setVoucherError('⚠️ This offer requires at least 2 eligible items in your bag.');
+            setIsApplyingVoucher(false);
+            return;
           }
-        }
-      });
+          // نحسب عدد الأزواج (كل قطعتين معاً)
+          const bogoPairs = Math.floor(eligibleItems.length / 2);
+          // نخصم 50% من أرخص المنتجات بناءً على عدد الأزواج
+          for (let i = 0; i < bogoPairs; i++) {
+            calculatedDiscount += eligibleItems[i].price * 0.5;
+          }
+          break;
+          
+        case 'b2g1_free': // اشتر 2 واحصل على 3 مجاناً
+          if (eligibleItems.length < 3) {
+            setVoucherError('⚠️ This offer requires at least 3 eligible items in your bag.');
+            setIsApplyingVoucher(false);
+            return;
+          }
+          // نحسب عدد المجموعات (كل 3 قطع معاً)
+          const b2g1Groups = Math.floor(eligibleItems.length / 3);
+          // نجعل أرخص المنتجات مجانية بالكامل بناءً على عدد المجموعات
+          for (let i = 0; i < b2g1Groups; i++) {
+            calculatedDiscount += eligibleItems[i].price;
+          }
+          break;
+          
+        default:
+          calculatedDiscount = 0;
+      }
 
-      if (!hasBoots || regularKitsPrices.length === 0) {
-        setVoucherError('⚠️ Promo code SHOES1 requires at least 1 Pair of Boots AND 1 Regular Season Kit.');
+      if (calculatedDiscount <= 0) {
+        setVoucherError('⚠️ Code applied, but no discount amount was generated based on your bag contents.');
+        setIsApplyingVoucher(false);
         return;
       }
 
-      regularKitsPrices.sort((a, b) => a - b);
-      const freeKitDiscount = regularKitsPrices[0]; // خصم كامل قيمة القميص الأرخص
-
-      setDiscountAmount(Number(freeKitDiscount.toFixed(2)));
-      setAppliedVoucher('SHOES1 (FREE KIT WITH BOOTS)');
+      // 4. تطبيق الخصم النهائي
+      setDiscountAmount(Number(calculatedDiscount.toFixed(2)));
+      setAppliedVoucher(`${promo.code}`);
       setVoucherCode('');
-      return;
+
+    } catch (err) {
+      console.error(err);
+      setVoucherError('❌ An error occurred while applying the code.');
     }
 
-    // 3. قسائم الولاء الثابتة (FD-5OFF أو FD-15OFF)
-    if (cleanCode.startsWith('FD-5OFF')) {
-      setDiscountAmount(5);
-      setAppliedVoucher(cleanCode);
-      setVoucherCode('');
-    } else if (cleanCode.startsWith('FD-15OFF')) {
-      setDiscountAmount(15);
-      setAppliedVoucher(cleanCode);
-      setVoucherCode('');
-    } else {
-      setVoucherError('❌ Invalid or expired promo code.');
-    }
+    setIsApplyingVoucher(false);
   };
 
   // إزالة الخصم
@@ -195,7 +212,7 @@ export default function CheckoutPage() {
       return;
     }
 
-    // 2. إرسال تنبيه فوري إلى إيميل footballdistrict812@gmail.com
+    // 2. إرسال تنبيه فوري للإيميل
     if (insertedOrder) {
       try {
         await fetch('/api/send-order-email', {
@@ -371,18 +388,19 @@ export default function CheckoutPage() {
                       <div className="relative flex-1">
                         <input
                           type="text"
-                          placeholder="Promo code (e.g. WEEK1, SHOES1)"
+                          placeholder="Promo code (e.g. PAY2)"
                           value={voucherCode}
                           onChange={(e) => setVoucherCode(e.target.value)}
-                          className="w-full bg-[#1a1a1a] border border-[#262626] rounded-xl py-3 pl-9 pr-3 text-xs uppercase text-white font-semibold focus:border-[#00AEEF] focus:outline-none"
+                          className="w-full bg-[#1a1a1a] border border-[#262626] rounded-xl py-3 pl-9 pr-3 text-xs uppercase text-white font-semibold focus:border-[#00AEEF] focus:outline-none tracking-widest"
                         />
                         <Tag className="w-3.5 h-3.5 text-gray-500 absolute left-3 top-3.5" />
                       </div>
                       <button
                         type="submit"
-                        className="bg-[#222] hover:bg-[#00AEEF] hover:text-white text-gray-300 font-bold px-5 rounded-xl text-xs transition border border-[#333]"
+                        disabled={isApplyingVoucher || !voucherCode.trim()}
+                        className="bg-[#222] hover:bg-[#00AEEF] disabled:opacity-50 disabled:hover:bg-[#222] text-white font-bold px-5 rounded-xl text-xs transition border border-[#333] flex items-center justify-center min-w-[70px]"
                       >
-                        Apply
+                        {isApplyingVoucher ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Apply'}
                       </button>
                     </div>
 
@@ -432,7 +450,9 @@ export default function CheckoutPage() {
                 }`}
               >
                 {isSubmitting ? (
-                  'Processing Order...'
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" /> Processing Order...
+                  </>
                 ) : (
                   <>
                     <ShoppingBag className="w-5 h-5" /> Place Order — ${total.toFixed(2)} COD

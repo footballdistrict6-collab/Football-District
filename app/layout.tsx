@@ -5,6 +5,7 @@ import "./globals.css";
 // استدعاء المكونات الأساسية التي تظهر في جميع الصفحات
 import Navbar from "@/components/Navbar";
 import PromoPopup from "@/components/PromoPopup";
+import { FacebookPixel } from "@/lib/fbPixel"; // 🚀 تمت إضافة بيكسل فيسبوك هنا
 
 // إعداد الخط الأساسي للموقع
 const inter = Inter({ subsets: ["latin"] });
@@ -23,6 +24,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={`${inter.className} bg-[#0a0a0a] text-white antialiased flex flex-col min-h-screen`}>
+        
+        {/* نظام التتبع (Meta Pixel) يعمل بصمت لجميع الصفحات */}
+        <FacebookPixel />
         
         {/* شريط التنقل العلوي (يظهر دائماً) */}
         <Navbar />

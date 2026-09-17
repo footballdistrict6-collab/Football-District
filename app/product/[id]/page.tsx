@@ -17,8 +17,8 @@ import {
 import Link from 'next/link';
 import SizeGuideModal from '@/components/SizeGuideModal';
 
-// مصفوفات المقاسات (للاستخدام كبديل احتياطي للمنتجات القديمة التي لم يتم تحديث مخزونها بعد)
-const KIT_SIZES = ['S', 'M', 'L', 'XL'];
+// تمت إضافة XXL هنا للمقاسات الاحتياطية
+const KIT_SIZES = ['S', 'M', 'L', 'XL', 'XXL'];
 const BOOT_SIZES = ['38', '39', '40', '41', '42', '43', '44', '45'];
 const KIDS_SIZES = ['2-4', '4-5', '5-6', '7-8', '9', '10-11', '12-13'];
 
@@ -77,7 +77,7 @@ export default function ProductDetailPage({ params }: PageProps) {
 
         let productVariants = variantsData || [];
 
-        // 3. نظام الحماية الذكي: إذا كان المنتج قديماً ولا يمتلك مقاسات في الجدول الجديد، ننشئ مقاسات وهمية لا نهائية مؤقتاً
+        // 3. نظام الحماية الذكي: إذا كان المنتج قديماً ولا يمتلك مقاسات في الجدول الجديد
         if (productVariants.length === 0) {
            const fallbackSizes = isBoot ? BOOT_SIZES : isKids ? KIDS_SIZES : KIT_SIZES;
            productVariants = fallbackSizes.map((s, idx) => ({
@@ -161,7 +161,7 @@ export default function ProductDetailPage({ params }: PageProps) {
 
     addItem({
       id: cartItemId,
-      variant_id: selectedVariant?.id, // تمت إضافة مُعرف المتغير لخصم المخزون لاحقاً عند الدفع
+      variant_id: selectedVariant?.id,
       title: cartItemTitle,
       price: finalPrice.toString(),
       image: mainImage,

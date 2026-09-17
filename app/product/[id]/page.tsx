@@ -183,7 +183,7 @@ export default function ProductDetailPage({ params }: PageProps) {
     `${isCustomized ? `👕 Customization: YES (Name: ${customName}, No:${customNumber})\n` : ''}` +
     `\nPlease confirm availability and total.`
   );
-  const whatsappNumber = "96170000000"; // يمكنك تغييره لرقمك
+  const whatsappNumber = "96176079774"; // يمكنك تغييره لرقمك
 
   return (
     <div className="bg-[#0a0a0a] min-h-screen py-16 text-white">

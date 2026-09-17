@@ -32,6 +32,11 @@ import {
 
 const STORE_CATEGORIES = ['Kits', 'Retro Kits', 'Kids', 'Special Orders', 'Boots', 'Equipment', 'Mystery Drop', 'Winter Collection', 'Long Sleeve', 'Training Suits', 'Windbreakers'];
 
+// المصفوفات الثابتة للمقاسات لتوليدها أوتوماتيكياً
+const KIT_SIZES = ['S', 'M', 'L', 'XL', 'XXL'];
+const BOOT_SIZES = ['38', '39', '40', '41', '42', '43', '44', '45'];
+const KIDS_SIZES = ['2-4', '4-5', '5-6', '7-8', '9', '10-11', '12-13'];
+
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState<'overview' | 'products' | 'inventory' | 'orders' | 'loyalty' | 'promos' | 'popup'>('overview');
   
@@ -110,20 +115,48 @@ export default function AdminDashboard() {
   const websiteOrdersCount = orders.filter(o => o.source === 'Website' || !o.source).length;
   const whatsappOrdersCount = orders.filter(o => o.source === 'WhatsApp').length;
 
-  // --- دوال المنتجات ---
+  // --- الدالة المحدثة: إضافة منتج فردي + توليد مقاساته أوتوماتيكياً ---
   const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newProduct.title || !newProduct.price) return alert("⚠️ يرجى إدخال عنوان المنتج وسعره!");
-    const { error } = await supabase.from('products').insert([{
+    
+    // 1. إدخال المنتج الأساسي واسترجاع الـ ID الخاص به
+    const { data: insertedProduct, error } = await supabase.from('products').insert([{
       title: newProduct.title, price: parseFloat(newProduct.price), category: newProduct.category, league: newProduct.league,
       image_url: newProduct.imageUrl || 'https://images.unsplash.com/photo-1583318433420-532155e9d9e4?q=80&w=500',
       image_urls: newProduct.imageUrl ? [newProduct.imageUrl] : [], loyalty_points_earned: Number(newProduct.loyalty_points_earned) || 20,
       in_stock: true
-    }]);
-    if (!error) { alert("✅ تم إضافة المنتج بنجاح!"); setNewProduct({ title: '', price: '', category: 'Kits', league: 'Premier League', imageUrl: '', loyalty_points_earned: 20 }); fetchData(); } 
-    else alert("🚨 خطأ أثناء الإضافة: " + error.message);
+    }]).select().single();
+
+    if (error) {
+      alert("🚨 خطأ أثناء الإضافة: " + error.message);
+      return;
+    }
+
+    if (insertedProduct) {
+      // 2. توليد المقاسات بناءً على الفئة
+      const categoryLower = newProduct.category.toLowerCase();
+      let sizesToCreate = KIT_SIZES;
+      if (categoryLower.includes('boot') || newProduct.category === 'Boots') sizesToCreate = BOOT_SIZES;
+      else if (categoryLower === 'kids' || categoryLower.includes('kids')) sizesToCreate = KIDS_SIZES;
+
+      const variantsToInsert = sizesToCreate.map(size => ({
+        product_id: insertedProduct.id,
+        size: size,
+        stock_quantity: 0, // الرصيد المبدئي 0
+        low_stock_threshold: 2
+      }));
+
+      // 3. إدخال المقاسات في جدول المخزون
+      await supabase.from('product_variants').insert(variantsToInsert);
+
+      alert("✅ تم إضافة المنتج وتوليد مقاساته في قسم المخزون (Inventory) بنجاح!"); 
+      setNewProduct({ title: '', price: '', category: 'Kits', league: 'Premier League', imageUrl: '', loyalty_points_earned: 20 }); 
+      fetchData();
+    }
   };
 
+  // --- الدالة المحدثة: رفع المنتجات عبر إكسل + توليد مقاساتها أوتوماتيكياً ---
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -145,9 +178,38 @@ export default function AdminDashboard() {
           in_stock: row.InStock !== undefined ? String(row.InStock).toLowerCase() === 'true' : true
         }));
 
-        const { error } = await supabase.from('products').insert(formattedProducts);
+        // 1. إدخال كل المنتجات دفعة واحدة واسترجاع بياناتها
+        const { data: insertedProducts, error } = await supabase.from('products').insert(formattedProducts).select();
+        
         if (error) throw error;
-        alert(`✅ Successfully added ${formattedProducts.length} products!`); fetchData();
+
+        // 2. تجهيز المقاسات لكل منتج تم إدخاله
+        let allVariantsToInsert: any[] = [];
+        if (insertedProducts && insertedProducts.length > 0) {
+          insertedProducts.forEach((prod) => {
+            const catLower = prod.category?.toLowerCase() || '';
+            let sizes = KIT_SIZES;
+            if (catLower.includes('boot') || prod.category === 'Boots') sizes = BOOT_SIZES;
+            else if (catLower === 'kids' || catLower.includes('kids')) sizes = KIDS_SIZES;
+
+            sizes.forEach(s => {
+              allVariantsToInsert.push({
+                product_id: prod.id,
+                size: s,
+                stock_quantity: 0, // الرصيد المبدئي 0
+                low_stock_threshold: 2
+              });
+            });
+          });
+
+          // 3. إدخال جميع المقاسات دفعة واحدة في جدول المخزون
+          if (allVariantsToInsert.length > 0) {
+            await supabase.from('product_variants').insert(allVariantsToInsert);
+          }
+        }
+
+        alert(`✅ Successfully added ${formattedProducts.length} products and generated their sizes in Inventory!`); 
+        fetchData();
       } catch (error: any) { alert("❌ Error: " + error.message); } 
       finally { setIsUploading(false); if (fileInputRef.current) fileInputRef.current.value = ''; }
     };
@@ -167,7 +229,7 @@ export default function AdminDashboard() {
   };
 
   const handleDeleteProduct = async (id: number | string) => {
-    if (!confirm("❓ هل أنت متأكد من الحذف؟")) return;
+    if (!confirm("❓ هل أنت متأكد من الحذف؟ سيتم حذف جميع مقاسات هذا المنتج من المخزون أيضاً.")) return;
     await supabase.from('products').delete().eq('id', id); fetchData();
   };
 
@@ -191,7 +253,6 @@ export default function AdminDashboard() {
 
   // --- دوال الطلبات المحدثة (الولاء + استرجاع المخزون الذكي) ---
   const updateOrderStatus = async (orderId: string, newStatus: string, currentStatus: string) => {
-    
     // 1. الاسترجاع التلقائي للمخزون إذا تم الإلغاء
     if ((newStatus === 'Cancelled' || newStatus === 'Returned') && currentStatus !== 'Cancelled' && currentStatus !== 'Returned') {
       const { data: orderItems } = await supabase.from('order_items').select('*').eq('order_id', orderId);
@@ -359,7 +420,7 @@ export default function AdminDashboard() {
               </div>
             )}
 
-            {/* 2. تبويب Inventory (الجديد كلياً) */}
+            {/* 2. تبويب Inventory */}
             {activeTab === 'inventory' && (
               <div className="bg-[#121212] rounded-2xl border border-[#1f1f1f] overflow-hidden animate-fadeIn">
                 <div className="p-6 border-b border-[#222] flex justify-between items-center bg-[#1a1a1a]">
@@ -406,16 +467,16 @@ export default function AdminDashboard() {
               </div>
             )}
 
-            {/* 3. تبويب المنتجات (قائمتك القديمة الممتازة + توفر) */}
+            {/* 3. تبويب المنتجات */}
             {activeTab === 'products' && (
               <div className="space-y-8 animate-fadeIn">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                   <form onSubmit={handleAddProduct} className="bg-[#121212] p-6 rounded-2xl border border-[#1f1f1f] space-y-4">
-                    <h3 className="font-bold text-lg border-b border-[#222] pb-3 flex items-center gap-2"><Plus className="w-5 h-5 text-[#00AEEF]" /> Add Single Product</h3>
+                    <h3 className="font-bold text-lg border-b border-[#222] pb-3 flex items-center gap-2"><Plus className="w-5 h-5 text-[#00AEEF]" /> Add Base Product</h3>
                     <input type="text" required value={newProduct.title} onChange={(e) => setNewProduct({ ...newProduct, title: e.target.value })} placeholder="Title (e.g. Arsenal Home)" className="w-full bg-[#1a1a1a] border border-[#333] rounded-lg p-3 text-white text-sm focus:border-[#00AEEF]" />
                     <div className="grid grid-cols-2 gap-4">
-                      <input type="number" step="0.01" required value={newProduct.price} onChange={(e) => setNewProduct({ ...newProduct, price: e.target.value })} placeholder="Price ($)" className="w-full bg-[#1a1a1a] border border-[#333] rounded-lg p-3 text-white text-sm focus:border-[#00AEEF]" />
-                      <input type="number" value={newProduct.loyalty_points_earned} onChange={(e) => setNewProduct({ ...newProduct, loyalty_points_earned: Number(e.target.value) })} placeholder="Points (e.g. 20)" className="w-full bg-[#1a1a1a] border border-[#333] rounded-lg p-3 text-white text-sm focus:border-[#00AEEF]" />
+                      <input type="number" step="0.01" required value={newProduct.price} onChange={(e) => setNewProduct({ ...newProduct, price: e.target.value })} placeholder="Base Price ($)" className="w-full bg-[#1a1a1a] border border-[#333] rounded-lg p-3 text-white text-sm focus:border-[#00AEEF]" />
+                      <input type="number" value={newProduct.loyalty_points_earned} onChange={(e) => setNewProduct({ ...newProduct, loyalty_points_earned: Number(e.target.value) })} placeholder="Loyalty Pts" className="w-full bg-[#1a1a1a] border border-[#333] rounded-lg p-3 text-white text-sm focus:border-[#00AEEF]" />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <select value={newProduct.category} onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })} className="w-full bg-[#1a1a1a] border border-[#333] rounded-lg p-3 text-white text-sm focus:border-[#00AEEF]">
@@ -426,7 +487,7 @@ export default function AdminDashboard() {
                       </select>
                     </div>
                     <input type="url" value={newProduct.imageUrl} onChange={(e) => setNewProduct({ ...newProduct, imageUrl: e.target.value })} placeholder="Image URL" className="w-full bg-[#1a1a1a] border border-[#333] rounded-lg p-3 text-white text-sm focus:border-[#00AEEF]" />
-                    <button type="submit" className="w-full bg-[#00AEEF] hover:bg-blue-500 text-white font-extrabold py-3 rounded-xl transition">+ Add Base Product</button>
+                    <button type="submit" className="w-full bg-[#00AEEF] hover:bg-blue-500 text-white font-extrabold py-3 rounded-xl transition">+ Create Product & Sync Inventory</button>
                   </form>
 
                   <div className="bg-[#121212] p-6 rounded-2xl border border-[#1f1f1f] flex flex-col justify-center items-center text-center">
@@ -441,7 +502,7 @@ export default function AdminDashboard() {
 
                 <div className="bg-[#121212] rounded-2xl border border-[#1f1f1f] overflow-hidden">
                   <div className="p-6 border-b border-[#222] flex justify-between items-center">
-                    <h3 className="font-bold text-lg">Store Inventory ({products.length})</h3>
+                    <h3 className="font-bold text-lg">Base Products List ({products.length})</h3>
                     <button onClick={fetchData} className="text-xs text-[#00AEEF] hover:underline flex items-center gap-1 font-bold"><RefreshCw className="w-3 h-3" /> Refresh List</button>
                   </div>
                   <div className="divide-y divide-[#1f1f1f] max-h-[600px] overflow-y-auto">
@@ -480,10 +541,9 @@ export default function AdminDashboard() {
               </div>
             )}
 
-            {/* 4. تبويب الطلبات (مع زر واتساب + القائمة المنسدلة الجديدة الذكية) */}
+            {/* 4. تبويب الطلبات */}
             {activeTab === 'orders' && (
                <div className="space-y-6 animate-fadeIn">
-                 {/* زر إنشاء طلب واتساب */}
                  <button onClick={() => setIsWhatsAppModalOpen(true)} className="bg-[#25D366] hover:bg-[#20b858] text-white font-extrabold px-6 py-4 rounded-xl shadow-lg flex items-center gap-2 transition">
                    <Smartphone className="w-5 h-5" /> + New WhatsApp Order
                  </button>
@@ -513,7 +573,6 @@ export default function AdminDashboard() {
                                 {order.notes && <p className="text-xs text-amber-400 mt-2 bg-amber-500/10 p-2 rounded border border-amber-500/30">📝 Notes: {order.notes}</p>}
                               </div>
                               <div className="flex items-center gap-3">
-                                {/* القائمة المنسدلة الذكية للحالات (مع استرجاع المخزون) */}
                                 <select 
                                   value={status} 
                                   onChange={(e) => updateOrderStatus(order.id, e.target.value, status)}
@@ -533,7 +592,6 @@ export default function AdminDashboard() {
                               </div>
                             </div>
                             <div className="bg-[#1a1a1a] p-3 rounded-xl border border-[#262626] space-y-1">
-                              {/* يدعم كلا النظامين للطلبات القديمة والجديدة */}
                               {order.order_items && order.order_items.length > 0 ? (
                                 order.order_items.map((item: any, idx: number) => {
                                   const v = variants.find(vr => vr.id === item.variant_id);
@@ -558,7 +616,7 @@ export default function AdminDashboard() {
                </div>
             )}
 
-            {/* 5. تبويب الأكواد الذكية (Promos) - كما هو تماماً! */}
+            {/* 5. تبويب الأكواد الذكية (Promos) */}
             {activeTab === 'promos' && (
               <div className="space-y-8 animate-fadeIn">
                 <form onSubmit={handleAddPromoCode} className="bg-[#121212] p-8 rounded-2xl border border-[#1f1f1f] shadow-xl max-w-4xl space-y-6">
@@ -619,11 +677,9 @@ export default function AdminDashboard() {
               </div>
             )}
 
-            {/* 6. تبويب الـ Popup Builder (متعدد العروض - كما هو تماماً!) */}
+            {/* 6. تبويب الـ Popup Builder */}
             {activeTab === 'popup' && (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fadeIn">
-                
-                {/* لوحة التحكم */}
                 <form onSubmit={handleSavePopupSettings} className="bg-[#121212] p-6 md:p-8 rounded-2xl border border-[#1f1f1f] shadow-xl space-y-6">
                   <div className="flex items-center justify-between border-b border-[#222] pb-4">
                     <h3 className="font-bold text-xl flex items-center gap-2"><Megaphone className="w-6 h-6 text-[#00AEEF]" /> Global Popup Builder</h3>
@@ -633,7 +689,6 @@ export default function AdminDashboard() {
                   </div>
 
                   <div className="space-y-6">
-                    {/* الإعدادات الأساسية للنافذة */}
                     <div className="space-y-4 bg-[#161616] p-5 rounded-xl border border-[#222]">
                       <div><label className="block text-xs font-bold text-gray-400 mb-1">Headline (Title)</label><input type="text" value={popupSettings.title} onChange={(e) => setPopupSettings({ ...popupSettings, title: e.target.value })} className="w-full bg-[#1a1a1a] border border-[#333] rounded-xl p-3 text-white focus:border-[#00AEEF] uppercase font-black" /></div>
                       <div><label className="block text-xs font-bold text-gray-400 mb-1">Subtext (Description)</label><input type="text" value={popupSettings.description} onChange={(e) => setPopupSettings({ ...popupSettings, description: e.target.value })} className="w-full bg-[#1a1a1a] border border-[#333] rounded-xl p-3 text-white focus:border-[#00AEEF]" /></div>
@@ -654,7 +709,6 @@ export default function AdminDashboard() {
                       </div>
                     </div>
 
-                    {/* إدارة العروض (البروموهات داخل البوب أب) */}
                     <div className="space-y-3 border-t border-[#222] pt-4">
                       <div className="flex items-center justify-between">
                         <h4 className="font-bold text-sm text-gray-300">Promo Code Blocks</h4>
@@ -673,7 +727,6 @@ export default function AdminDashboard() {
                       ))}
                     </div>
 
-                    {/* الزر والفوتر */}
                     <div className="grid grid-cols-2 gap-4 border-t border-[#222] pt-4">
                       <div><label className="block text-xs font-bold text-gray-400 mb-1">Button Text</label><input type="text" value={popupSettings.button_text} onChange={(e) => setPopupSettings({ ...popupSettings, button_text: e.target.value })} className="w-full bg-[#1a1a1a] border border-[#333] rounded-xl p-3 text-white focus:border-[#00AEEF] font-bold text-sm" /></div>
                       <div><label className="block text-xs font-bold text-gray-400 mb-1">Button Link</label><input type="text" value={popupSettings.button_link} onChange={(e) => setPopupSettings({ ...popupSettings, button_link: e.target.value })} className="w-full bg-[#1a1a1a] border border-[#333] rounded-xl p-3 text-white focus:border-[#00AEEF] text-sm" /></div>
@@ -684,7 +737,6 @@ export default function AdminDashboard() {
                   <button type="submit" className="w-full bg-[#00AEEF] hover:bg-blue-500 text-white font-extrabold py-4 rounded-xl transition shadow-lg text-lg">Save Popup Settings</button>
                 </form>
 
-                {/* المعاينة الحية (Live Preview) - مطابقة لتصميمك الرائع */}
                 <div className="hidden lg:flex flex-col items-center justify-center p-8 bg-[#0a0a0a] border-2 border-dashed border-[#222] rounded-2xl relative">
                   <div className="absolute top-4 left-4 text-xs font-bold text-gray-500 uppercase flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span> Live Preview</div>
                   
@@ -727,7 +779,7 @@ export default function AdminDashboard() {
               </div>
             )}
 
-            {/* 7. تبويب الولاء (كما هو تماماً!) */}
+            {/* 7. تبويب الولاء */}
             {activeTab === 'loyalty' && (
               <div className="bg-[#121212] p-8 rounded-2xl border border-[#1f1f1f] max-w-xl space-y-6">
                 <h3 className="font-bold text-xl border-b border-[#222] pb-4 flex items-center gap-2">
@@ -745,9 +797,7 @@ export default function AdminDashboard() {
           </>
         )}
 
-        {/* --- نوافذ منبثقة للوحة التحكم (Edit Product & WhatsApp Order) --- */}
-        
-        {/* نافذة تعديل المنتج (Edit Product) */}
+        {/* --- نوافذ منبثقة للوحة التحكم --- */}
         {editingProduct && (
           <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
             <div className="bg-[#121212] border border-[#222] rounded-2xl p-6 max-w-lg w-full space-y-4 relative shadow-2xl">
@@ -784,7 +834,6 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* نافذة إنشاء طلب واتساب اليدوي (WhatsApp Order Modal) */}
         {isWhatsAppModalOpen && (
           <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
             <div className="bg-[#121212] border border-[#25D366]/40 rounded-2xl p-6 max-w-lg w-full space-y-4 shadow-[0_0_50px_rgba(37,211,102,0.1)]">

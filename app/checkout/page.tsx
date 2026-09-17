@@ -55,7 +55,6 @@ export default function CheckoutPage() {
     setIsApplyingVoucher(true);
 
     try {
-      // 1. البحث عن الكود في قاعدة البيانات
       const { data: promo, error } = await supabase
         .from('promo_codes')
         .select('*')
@@ -69,17 +68,14 @@ export default function CheckoutPage() {
         return;
       }
 
-      // 2. تصفية المنتجات في السلة التي يشملها العرض وفك الكميات لقطع مفردة
       let eligibleItems: { price: number; category: string; title: string }[] = [];
       
       items.forEach((item: any) => {
-        // التحقق مما إذا كان المنتج ينتمي للفئات المستهدفة بالبرومو (إذا كانت فارغة فهذا يعني أن العرض يشمل كل المتجر)
         const isEligible = !promo.target_categories || promo.target_categories.length === 0 || promo.target_categories.includes(item.category);
         
         if (isEligible) {
           const qty = Number(item.quantity) || 1;
           const price = parseFloat(item.price) || 0;
-          // تفكيك الكمية (إذا كان يشتري 3 من نفس القميص، نجعلها 3 عناصر منفصلة لسهولة حساب عروض الـ BOGO)
           for (let i = 0; i < qty; i++) {
             eligibleItems.push({ price, category: item.category, title: item.title });
           }
@@ -92,52 +88,39 @@ export default function CheckoutPage() {
         return;
       }
 
-      // ترتيب المنتجات المشمولة بالعرض من الأرخص إلى الأغلى (مهم جداً لعروض BOGO)
       eligibleItems.sort((a, b) => a.price - b.price);
-      
-      // إجمالي سعر المنتجات المشمولة بالعرض فقط
       const eligibleSubtotal = eligibleItems.reduce((sum, item) => sum + item.price, 0);
-      
       let calculatedDiscount = 0;
 
-      // 3. حساب الخصم بناءً على نوع البرومو
       switch (promo.discount_type) {
         case 'percentage':
           calculatedDiscount = eligibleSubtotal * (Number(promo.discount_value) / 100);
           break;
-          
         case 'fixed':
-          calculatedDiscount = Math.min(eligibleSubtotal, Number(promo.discount_value)); // الخصم لا يمكن أن يتجاوز قيمة المنتجات المشمولة
+          calculatedDiscount = Math.min(eligibleSubtotal, Number(promo.discount_value));
           break;
-          
-        case 'bogo_50': // اشتر 1 واحصل على 2 بنصف السعر
+        case 'bogo_50':
           if (eligibleItems.length < 2) {
             setVoucherError('⚠️ This offer requires at least 2 eligible items in your bag.');
             setIsApplyingVoucher(false);
             return;
           }
-          // نحسب عدد الأزواج (كل قطعتين معاً)
           const bogoPairs = Math.floor(eligibleItems.length / 2);
-          // نخصم 50% من أرخص المنتجات بناءً على عدد الأزواج
           for (let i = 0; i < bogoPairs; i++) {
             calculatedDiscount += eligibleItems[i].price * 0.5;
           }
           break;
-          
-        case 'b2g1_free': // اشتر 2 واحصل على 3 مجاناً
+        case 'b2g1_free':
           if (eligibleItems.length < 3) {
             setVoucherError('⚠️ This offer requires at least 3 eligible items in your bag.');
             setIsApplyingVoucher(false);
             return;
           }
-          // نحسب عدد المجموعات (كل 3 قطع معاً)
           const b2g1Groups = Math.floor(eligibleItems.length / 3);
-          // نجعل أرخص المنتجات مجانية بالكامل بناءً على عدد المجموعات
           for (let i = 0; i < b2g1Groups; i++) {
             calculatedDiscount += eligibleItems[i].price;
           }
           break;
-          
         default:
           calculatedDiscount = 0;
       }
@@ -148,7 +131,6 @@ export default function CheckoutPage() {
         return;
       }
 
-      // 4. تطبيق الخصم النهائي
       setDiscountAmount(Number(calculatedDiscount.toFixed(2)));
       setAppliedVoucher(`${promo.code}`);
       setVoucherCode('');
@@ -161,14 +143,13 @@ export default function CheckoutPage() {
     setIsApplyingVoucher(false);
   };
 
-  // إزالة الخصم
   const handleRemoveVoucher = () => {
     setDiscountAmount(0);
     setAppliedVoucher(null);
     setVoucherError(null);
   };
 
-  // تقديم الطلب وحفظه في Supabase + إرسال تنبيه الإيميل
+  // --- التحديث هنا: استخدام الدالة الآمنة (RPC) وحل مشكلة توافر المخزون ---
   const handleSubmitOrder = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -177,55 +158,73 @@ export default function CheckoutPage() {
       return;
     }
 
+    // حماية: إذا كان لدى الزبون منتجات قديمة في السلة من قبل التحديث لا تحتوي على variant_id
+    const missingVariant = items.find((i: any) => !i.variant_id);
+    if (missingVariant) {
+      alert("⚠️ Some items in your bag require an update. Please clear your cart, re-add your items, and try again!");
+      return;
+    }
+
     setIsSubmitting(true);
 
-    // حساب مجموع النقاط المكتسبة من الطلب
     const totalPointsEarned = items.reduce((sum, item) => {
       const points = Number(item.loyalty_points_earned) > 0 ? Number(item.loyalty_points_earned) : 20;
       return sum + (points * (Number(item.quantity) || 1));
     }, 0);
 
-    const orderData = {
-      first_name: formData.first_name.trim(),
-      last_name: formData.last_name.trim(),
-      phone: formData.phone.trim(),
-      address: formData.address.trim(),
-      notes: formData.notes.trim() || null,
-      items: items,
-      total_amount: Number(total.toFixed(2)),
-      points_earned: totalPointsEarned,
-      status: 'Pending',
-      promo_code: appliedVoucher || null,
-      created_at: new Date().toISOString()
-    };
-
-    // 1. حفظ الطلب في قاعدة البيانات
-    const { data: insertedOrder, error } = await supabase
-      .from('orders')
-      .insert([orderData])
-      .select()
-      .single();
+    // 1. الدفع عبر المعاملة الآمنة في قاعدة البيانات (Transaction)
+    const { data: orderId, error } = await supabase.rpc('process_checkout', {
+      p_first_name: formData.first_name.trim(),
+      p_last_name: formData.last_name.trim(),
+      p_phone: formData.phone.trim(),
+      p_address: formData.address.trim(),
+      p_notes: formData.notes.trim() || null,
+      p_source: 'Website', // وضع المصدر تلقائياً كـ Website
+      p_promo: appliedVoucher || null,
+      p_total: Number(total.toFixed(2)),
+      p_points_earned: totalPointsEarned,
+      p_items: items.map((i: any) => ({
+        variant_id: i.variant_id,
+        qty: Number(i.quantity) || 1,
+        price: parseFloat(i.price) || 0
+      }))
+    });
 
     if (error) {
-      alert("🚨 Something went wrong placing your order: " + error.message);
+      // إذا نفدت الكمية أثناء الدفع
+      if (error.message.includes('Out of stock')) {
+        alert("⚠️ Sorry, one or more items in your cart just went out of stock! Please review your cart.");
+      } else {
+        alert("🚨 Something went wrong placing your order: " + error.message);
+      }
       setIsSubmitting(false);
       return;
     }
 
-    // 2. إرسال تنبيه فوري للإيميل
-    if (insertedOrder) {
+    // 2. إرسال إيميل التأكيد (مع الإبقاء على شكل البيانات القديم لكي لا يتعطل الإيميل)
+    if (orderId) {
       try {
         await fetch('/api/send-order-email', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(insertedOrder),
+          body: JSON.stringify({
+            id: orderId,
+            first_name: formData.first_name,
+            last_name: formData.last_name,
+            phone: formData.phone,
+            address: formData.address,
+            notes: formData.notes,
+            total_amount: total,
+            promo_code: appliedVoucher,
+            items: items // نرسل السلة للإيميل كي تظهر الأسماء والصور
+          }),
         });
       } catch (mailErr) {
         console.error("Didn't send notification email:", mailErr);
       }
     }
 
-    // 3. تفريغ السلة وتوجيه العميل لصفحة النجاح
+    // 3. تفريغ السلة وتوجيه العميل
     clearCart();
     router.push('/success');
   };
@@ -259,7 +258,6 @@ export default function CheckoutPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
           
-          {/* نموذج معلومات العميل والتوصيل (العمود الأيسر - 7 أعمدة) */}
           <div className="lg:col-span-7 space-y-6">
             <div className="bg-[#121212] p-6 md:p-8 rounded-2xl border border-[#1f1f1f]">
               <h2 className="text-xl font-extrabold uppercase tracking-tight mb-6 flex items-center gap-2">
@@ -337,14 +335,12 @@ export default function CheckoutPage() {
             </div>
           </div>
 
-          {/* ملخص الطلب والبروموكود (العمود الأيمن - 5 أعمدة) */}
           <div className="lg:col-span-5 space-y-6">
             <div className="bg-[#121212] p-6 md:p-8 rounded-2xl border border-[#1f1f1f] space-y-6">
               <h2 className="text-xl font-extrabold uppercase tracking-tight border-b border-[#222] pb-4">
                 Order Summary ({items.reduce((acc, item) => acc + (Number(item.quantity) || 1), 0)})
               </h2>
 
-              {/* عناصر السلة */}
               <div className="space-y-4 max-h-60 overflow-y-auto pr-1 divide-y divide-[#1f1f1f]">
               {items.map((item: any) => (
                   <div key={item.id} className="pt-3 first:pt-0 flex justify-between items-center text-sm">
@@ -366,7 +362,6 @@ export default function CheckoutPage() {
                 ))}
               </div>
 
-              {/* قسم البروموكود والعروض */}
               <div className="border-t border-[#222] pt-4">
                 {appliedVoucher ? (
                   <div className="bg-green-950/40 border border-green-500 rounded-xl p-3.5 flex items-center justify-between">
@@ -413,7 +408,6 @@ export default function CheckoutPage() {
                 )}
               </div>
 
-              {/* الحسابات النهائية */}
               <div className="border-t border-[#222] pt-4 space-y-2 text-sm">
                 <div className="flex justify-between text-gray-400">
                   <span>Subtotal</span>
@@ -438,7 +432,6 @@ export default function CheckoutPage() {
                 </div>
               </div>
 
-              {/* زر إتمام الطلب */}
               <button
                 type="submit"
                 form="checkout-form"

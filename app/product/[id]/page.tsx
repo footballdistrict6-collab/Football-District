@@ -11,15 +11,16 @@ import {
   Clock, 
   ArrowLeft, 
   CheckCircle2, 
-  Sparkles 
+  Sparkles,
+  MessageCircle
 } from 'lucide-react';
 import Link from 'next/link';
 import SizeGuideModal from '@/components/SizeGuideModal';
 
-// مصفوفات المقاسات المحدثة
+// مصفوفات المقاسات (للاستخدام كبديل احتياطي للمنتجات القديمة التي لم يتم تحديث مخزونها بعد)
 const KIT_SIZES = ['S', 'M', 'L', 'XL'];
 const BOOT_SIZES = ['38', '39', '40', '41', '42', '43', '44', '45'];
-const KIDS_SIZES = ['2-4', '4-5', '5-6', '7-8', '9', '10-11', '12-13']; // مقاسات الأطفال الجديدة
+const KIDS_SIZES = ['2-4', '4-5', '5-6', '7-8', '9', '10-11', '12-13'];
 
 interface PageProps {
   params: Promise<{
@@ -32,7 +33,12 @@ export default function ProductDetailPage({ params }: PageProps) {
 
   const [product, setProduct] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
+  
+  // حالة المتغيرات والمخزون
+  const [variants, setVariants] = useState<any[]>([]);
+  const [selectedVariant, setSelectedVariant] = useState<any | null>(null);
   const [selectedSize, setSelectedSize] = useState('');
+
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [addedToCart, setAddedToCart] = useState(false);
 
@@ -45,29 +51,57 @@ export default function ProductDetailPage({ params }: PageProps) {
   const { addItem } = useCartStore();
 
   useEffect(() => {
-    async function fetchProduct() {
+    async function fetchProductAndVariants() {
       setLoading(true);
-      const { data, error } = await supabase
+      
+      // 1. جلب المنتج الأساسي
+      const { data: productData, error: productError } = await supabase
         .from('products')
         .select('*')
         .eq('id', id)
         .single();
 
-      if (data && !error) {
-        setProduct(data);
+      if (productData && !productError) {
+        setProduct(productData);
         
-        const categoryLower = data.category?.toLowerCase() || '';
-        const isBoot = categoryLower.includes('boot') || data.category === 'Boots';
+        const categoryLower = productData.category?.toLowerCase() || '';
+        const isBoot = categoryLower.includes('boot') || productData.category === 'Boots';
         const isKids = categoryLower === 'kids' || categoryLower.includes('kids');
         
-        // تحديد المقاس الافتراضي
-        setSelectedSize(isBoot ? '42' : isKids ? '7-8' : 'L');
+        // 2. جلب مقاسات ومخزون هذا المنتج من قاعدة البيانات (إن وجدت)
+        const { data: variantsData } = await supabase
+          .from('product_variants')
+          .select('*')
+          .eq('product_id', id)
+          .order('id', { ascending: true });
+
+        let productVariants = variantsData || [];
+
+        // 3. نظام الحماية الذكي: إذا كان المنتج قديماً ولا يمتلك مقاسات في الجدول الجديد، ننشئ مقاسات وهمية لا نهائية مؤقتاً
+        if (productVariants.length === 0) {
+           const fallbackSizes = isBoot ? BOOT_SIZES : isKids ? KIDS_SIZES : KIT_SIZES;
+           productVariants = fallbackSizes.map((s, idx) => ({
+               id: `fallback-${idx}`,
+               size: s,
+               stock_quantity: 999, // مخزون لا نهائي للمنتجات القديمة لتفادي تعطل المتجر
+               low_stock_threshold: 2
+           }));
+        }
+
+        setVariants(productVariants);
+
+        // 4. تحديد المقاس الافتراضي (أول مقاس متوفر في المخزون)
+        const firstAvailable = productVariants.find(v => v.stock_quantity > 0) || productVariants[0];
+        if (firstAvailable) {
+          setSelectedSize(firstAvailable.size);
+          setSelectedVariant(firstAvailable);
+        }
       }
       setLoading(false);
     }
 
     if (id) {
-      fetchProduct();
+      fetchProductAndVariants();
     }
   }, [id]);
 
@@ -105,13 +139,10 @@ export default function ProductDetailPage({ params }: PageProps) {
   const isKidsCategory = categoryLower === 'kids' || categoryLower.includes('kids');
   const isPrintable = product.category === 'Kits' || product.category === 'Retro Kits' || isKidsCategory || categoryLower.includes('jersey');
   
-  let currentAvailableSizes = KIT_SIZES;
-  if (isBootCategory) currentAvailableSizes = BOOT_SIZES;
-  else if (isKidsCategory) currentAvailableSizes = KIDS_SIZES;
-
   const basePrice = parseFloat(product.price) || 0;
   const finalPrice = isCustomized ? basePrice + 5.00 : basePrice;
 
+  // --- دالة إضافة المنتج للسلة ---
   const handleAddToCart = () => {
     if (isCustomized && (!customName.trim() || !customNumber.trim())) {
       alert('⚠️ Please enter both the Name and Number for your custom print.');
@@ -130,6 +161,7 @@ export default function ProductDetailPage({ params }: PageProps) {
 
     addItem({
       id: cartItemId,
+      variant_id: selectedVariant?.id, // تمت إضافة مُعرف المتغير لخصم المخزون لاحقاً عند الدفع
       title: cartItemTitle,
       price: finalPrice.toString(),
       image: mainImage,
@@ -142,6 +174,17 @@ export default function ProductDetailPage({ params }: PageProps) {
     setTimeout(() => setAddedToCart(false), 2500);
   };
 
+  // --- إعداد رسالة الواتساب للطلب المباشر ---
+  const whatsappMessage = encodeURIComponent(
+    `Hello! I would like to order from the website:\n\n` +
+    `🏆 Product: ${product.title}\n` +
+    `📏 Size: ${selectedSize}\n` +
+    `💵 Price: $${finalPrice.toFixed(2)}\n` +
+    `${isCustomized ? `👕 Customization: YES (Name: ${customName}, No:${customNumber})\n` : ''}` +
+    `\nPlease confirm availability and total.`
+  );
+  const whatsappNumber = "96170000000"; // يمكنك تغييره لرقمك
+
   return (
     <div className="bg-[#0a0a0a] min-h-screen py-16 text-white">
       <div className="container mx-auto px-6 max-w-6xl">
@@ -152,6 +195,7 @@ export default function ProductDetailPage({ params }: PageProps) {
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 items-start">
           
+          {/* قسم الصور */}
           <div className="lg:col-span-7 space-y-4">
             <div className="relative h-[450px] md:h-[550px] bg-[#121212] border border-[#1f1f1f] rounded-2xl overflow-hidden flex items-center justify-center">
               <img src={mainImage} alt={product.title} className="object-cover h-full w-full opacity-90 hover:opacity-100 transition duration-500" />
@@ -176,6 +220,7 @@ export default function ProductDetailPage({ params }: PageProps) {
             )}
           </div>
 
+          {/* تفاصيل المنتج وخيارات الشراء */}
           <div className="lg:col-span-5 bg-[#121212] p-6 md:p-8 rounded-2xl border border-[#1f1f1f] space-y-6 sticky top-24">
             
             <div className="flex items-center gap-2 flex-wrap">
@@ -200,12 +245,12 @@ export default function ProductDetailPage({ params }: PageProps) {
               </div>
             </div>
 
+            {/* قسم المقاسات (ديناميكي ومرتبط بالمخزون) */}
             <div className="border-t border-[#222] pt-6">
               <div className="flex justify-between items-center mb-3">
                 <label className="block text-xs font-extrabold uppercase text-gray-400 tracking-wider">
                   Select Size {isBootCategory ? '(EU)' : isKidsCategory ? '(Age)' : '(Adult)'}
                 </label>
-                {/* إظهار الدليل لكل المنتجات عدا الأحذية */}
                 {!isBootCategory && (
                   <button 
                     onClick={() => setIsSizeGuideOpen(true)}
@@ -216,14 +261,43 @@ export default function ProductDetailPage({ params }: PageProps) {
                 )}
               </div>
               <div className="flex flex-wrap gap-3">
-                {currentAvailableSizes.map((size) => (
-                  <button key={size} type="button" onClick={() => setSelectedSize(size)} className={`px-4 h-12 rounded-xl font-bold text-sm transition border flex items-center justify-center min-w-[3.5rem] ${selectedSize === size ? 'bg-[#00AEEF] text-white border-[#00AEEF] shadow-[0_0_15px_rgba(0,174,239,0.4)]' : 'bg-[#1a1a1a] text-gray-300 border-[#2b2b2b] hover:border-gray-500'}`}>
-                    {size}
-                  </button>
-                ))}
+                {variants.map((v) => {
+                  const isOutOfStock = v.stock_quantity === 0;
+                  const isLowStock = v.stock_quantity > 0 && v.stock_quantity <= (v.low_stock_threshold || 2);
+                  const isSelected = selectedSize === v.size;
+
+                  return (
+                    <button 
+                      key={v.id} 
+                      type="button" 
+                      disabled={isOutOfStock}
+                      onClick={() => {
+                        setSelectedSize(v.size);
+                        setSelectedVariant(v);
+                      }} 
+                      className={`relative px-4 h-12 rounded-xl font-bold text-sm transition border flex items-center justify-center min-w-[3.5rem] 
+                        ${isOutOfStock ? 'bg-[#1a0505] text-gray-600 border-red-900/30 opacity-60 cursor-not-allowed line-through' 
+                        : isSelected ? 'bg-[#00AEEF] text-white border-[#00AEEF] shadow-[0_0_15px_rgba(0,174,239,0.4)]' 
+                        : 'bg-[#1a1a1a] text-gray-300 border-[#2b2b2b] hover:border-gray-500'}`}
+                    >
+                      {v.size}
+                      
+                      {/* علامة Low Stock الذكية */}
+                      {isLowStock && !isOutOfStock && (
+                        <span className="absolute -top-2 -right-2 bg-red-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow whitespace-nowrap">
+                          Only {v.stock_quantity}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
+              {(!selectedVariant || selectedVariant.stock_quantity === 0) && (
+                <p className="text-red-400 text-xs font-bold mt-3">⚠️ This size is currently Out of Stock.</p>
+              )}
             </div>
 
+            {/* قسم الطباعة الشخصية */}
             {isPrintable && (
               <div className="border-t border-[#222] pt-6 transition-all">
                 <div className="flex items-center justify-between mb-4">
@@ -275,19 +349,33 @@ export default function ProductDetailPage({ params }: PageProps) {
               </div>
             )}
 
-            <button
-              onClick={handleAddToCart}
-              disabled={addedToCart}
-              className={`w-full font-extrabold py-5 rounded-xl transition shadow-lg text-lg flex items-center justify-center gap-3 mt-4 ${
-                addedToCart ? 'bg-green-600 text-white shadow-[0_0_20px_rgba(22,163,74,0.4)]' : 'bg-[#00AEEF] hover:bg-blue-500 text-white shadow-[0_0_20px_rgba(0,174,239,0.3)]'
-              }`}
-            >
-              {addedToCart ? (
-                <><CheckCircle2 className="w-6 h-6 animate-bounce" /> Added to Cart!</>
-              ) : (
-                <><ShoppingCart className="w-6 h-6" /> Add to Cart — ${finalPrice.toFixed(2)}</>
-              )}
-            </button>
+            {/* أزرار الشراء المزدوجة (الموقع والواتساب) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
+              <button
+                onClick={handleAddToCart}
+                disabled={addedToCart || !selectedVariant || selectedVariant.stock_quantity === 0}
+                className={`w-full font-extrabold py-4 rounded-xl transition shadow-lg text-sm flex items-center justify-center gap-2 ${
+                  addedToCart 
+                    ? 'bg-green-600 text-white shadow-[0_0_20px_rgba(22,163,74,0.4)]' 
+                    : 'bg-[#00AEEF] hover:bg-blue-500 text-white shadow-[0_0_20px_rgba(0,174,239,0.3)]'
+                } disabled:opacity-50 disabled:cursor-not-allowed`}
+              >
+                {addedToCart ? (
+                  <><CheckCircle2 className="w-5 h-5 animate-bounce" /> Added to Cart!</>
+                ) : (
+                  <><ShoppingCart className="w-5 h-5" /> Add to Cart — ${finalPrice.toFixed(2)}</>
+                )}
+              </button>
+
+              <a
+                href={`https://wa.me/${whatsappNumber}?text=${whatsappMessage}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`w-full font-extrabold py-4 rounded-xl transition shadow-lg text-sm flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#20b858] text-white shadow-[0_0_20px_rgba(37,211,102,0.3)] disabled:opacity-50 disabled:cursor-not-allowed ${(!selectedVariant || selectedVariant.stock_quantity === 0) ? 'pointer-events-none opacity-50 grayscale' : ''}`}
+              >
+                <MessageCircle className="w-5 h-5" /> Order on WhatsApp
+              </a>
+            </div>
 
             <div className="grid grid-cols-2 gap-4 pt-4 border-t border-[#222] text-xs text-gray-400">
               <div className="flex items-center gap-2">

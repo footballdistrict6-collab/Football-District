@@ -9,6 +9,7 @@ export interface CartItem {
   quantity: number;
   category?: string;
   loyalty_points_earned?: number;
+  variant_id?: any;
 }
 
 interface CartState {

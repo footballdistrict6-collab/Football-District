@@ -2,18 +2,18 @@
 
 import Script from 'next/script';
 import { usePathname, useSearchParams } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
-export const FB_PIXEL_ID = process.env.NEXT_PUBLIC_FB_PIXEL_ID;
+export const FB_PIXEL_ID = process.env.NEXT_PUBLIC_FB_PIXEL_ID || '1722417688864625';
 
-// Hybrid Tracking Function
+// Hybrid Tracking Function (Client-side Browser Pixel + Server-side CAPI)
 export const trackFbEvent = async (
   eventName: string,
   customData: any = {},
   userData: any = {}
 ) => {
   // Generate a unique ID to deduplicate the Browser and Server events
-  const eventId = crypto.randomUUID(); 
+  const eventId = typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`; 
 
   // 1. Fire Client-Side (Browser)
   if (typeof window !== 'undefined' && (window as any).fbq) {
@@ -30,7 +30,7 @@ export const trackFbEvent = async (
         eventId,
         customData,
         userData,
-        sourceUrl: window.location.href,
+        sourceUrl: typeof window !== 'undefined' ? window.location.href : '',
       }),
     });
   } catch (err) {
@@ -38,37 +38,24 @@ export const trackFbEvent = async (
   }
 };
 
-// Base Pixel Component
+// Route Change Listener for Next.js SPA navigation
 export function FacebookPixel() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const isInitialMount = useRef(true);
 
   useEffect(() => {
-    // Track standard page views
+    // Skip tracking on initial mount because the head script already executes fbq('track', 'PageView')
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      return;
+    }
+
+    // Track standard page views on subsequent SPA route changes
     if (typeof window !== 'undefined' && (window as any).fbq) {
       trackFbEvent('PageView');
     }
   }, [pathname, searchParams]);
 
-  if (!FB_PIXEL_ID) return null;
-
-  return (
-    <Script
-      id="fb-pixel"
-      strategy="afterInteractive"
-      dangerouslySetInnerHTML={{
-        __html: `
-          !function(f,b,e,v,n,t,s)
-          {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-          n.callMethod.apply(n,arguments):n.queue.push(arguments)};
-          if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
-          n.queue=[];t=b.createElement(e);t.async=!0;
-          t.src=v;s=b.getElementsByTagName(e)[0];
-          s.parentNode.insertBefore(t,s)}(window, document,'script',
-          'https://connect.facebook.net/en_US/fbevents.js');
-          fbq('init', '${FB_PIXEL_ID}');
-        `,
-      }}
-    />
-  );
+  return null;
 }

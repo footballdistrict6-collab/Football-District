@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCartStore } from '@/store/cart';
 import { supabase } from '@/lib/supabase';
+import { trackFbEvent } from '@/lib/fbPixel';
 import { 
   ShoppingBag, 
   Truck, 
@@ -43,6 +44,19 @@ export default function CheckoutPage() {
   const subtotal = items.reduce((sum, item) => sum + (parseFloat(item.price) * item.quantity), 0);
   const shipping = 4.00;
   const total = Math.max(0, subtotal + shipping - discountAmount);
+
+  // إرسال حدث InitiateCheckout عند دخول صفحة إتمام الطلب
+  useEffect(() => {
+    if (items.length > 0) {
+      trackFbEvent('InitiateCheckout', {
+        num_items: items.reduce((sum, item) => sum + (Number(item.quantity) || 1), 0),
+        value: parseFloat(total.toFixed(2)),
+        currency: 'USD',
+        content_ids: items.map(item => item.variant_id || item.id),
+        content_type: 'product'
+      });
+    }
+  }, []);
 
   // --- النظام الذكي لتطبيق أكواد الخصم من قاعدة البيانات ---
   const handleApplyVoucher = async (e: React.FormEvent) => {
@@ -224,7 +238,21 @@ export default function CheckoutPage() {
       }
     }
 
-    // 3. تفريغ السلة وتوجيه العميل
+    // 3. إرسال حدث Purchase إلى Meta Pixel و CAPI
+    trackFbEvent('Purchase', {
+      value: parseFloat(total.toFixed(2)),
+      currency: 'USD',
+      content_ids: items.map((i: any) => i.variant_id || i.id),
+      content_type: 'product',
+      num_items: items.reduce((sum, item) => sum + (Number(item.quantity) || 1), 0),
+      order_id: String(orderId)
+    }, {
+      firstName: formData.first_name.trim(),
+      lastName: formData.last_name.trim(),
+      phone: formData.phone.trim()
+    });
+
+    // 4. تفريغ السلة وتوجيه العميل
     clearCart();
     router.push('/success');
   };

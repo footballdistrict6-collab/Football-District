@@ -4,6 +4,7 @@ import { useCartStore } from '@/store/cart';
 import Link from 'next/link';
 import { ShoppingBag, Trash2, Plus, Minus } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { trackFbEvent } from '@/lib/fbPixel';
 
 export default function CartPage() {
   const { items, updateQuantity, removeItem } = useCartStore();
@@ -101,6 +102,15 @@ export default function CartPage() {
                 
                 <Link 
                   href="/checkout"
+                  onClick={() => {
+                    trackFbEvent('InitiateCheckout', {
+                      num_items: items.reduce((sum, item) => sum + (Number(item.quantity) || 1), 0),
+                      value: parseFloat(total.toFixed(2)),
+                      currency: 'USD',
+                      content_ids: items.map(item => item.id),
+                      content_type: 'product'
+                    });
+                  }}
                   className="w-full bg-[#00AEEF] text-white font-bold py-4 rounded hover:bg-blue-500 transition shadow-[0_0_15px_rgba(0,174,239,0.3)] block text-center"
                 >
                   Proceed to Checkout

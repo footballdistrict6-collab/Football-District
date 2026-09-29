@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import SizeGuideModal from '@/components/SizeGuideModal';
+import { trackFbEvent } from '@/lib/fbPixel';
 
 // تمت إضافة XXL هنا للمقاسات الاحتياطية
 const KIT_SIZES = ['S', 'M', 'L', 'XL', 'XXL'];
@@ -63,6 +64,16 @@ export default function ProductDetailPage({ params }: PageProps) {
 
       if (productData && !productError) {
         setProduct(productData);
+        
+        // إرسال حدث ViewContent إلى Meta Pixel
+        trackFbEvent('ViewContent', {
+          content_name: productData.title,
+          content_category: productData.category,
+          content_ids: [String(productData.id)],
+          content_type: 'product',
+          value: parseFloat(productData.price) || 0,
+          currency: 'USD'
+        });
         
         const categoryLower = productData.category?.toLowerCase() || '';
         const isBoot = categoryLower.includes('boot') || productData.category === 'Boots';
@@ -184,6 +195,16 @@ export default function ProductDetailPage({ params }: PageProps) {
       quantity: 1,
       category: product.category || 'Kits',
       loyalty_points_earned: finalPoints
+    });
+
+    // إرسال حدث AddToCart إلى Meta Pixel
+    trackFbEvent('AddToCart', {
+      content_name: product.title,
+      content_category: product.category,
+      content_ids: [String(product.id)],
+      content_type: 'product',
+      value: finalPrice,
+      currency: 'USD'
     });
 
     setAddedToCart(true);
@@ -434,6 +455,17 @@ export default function ProductDetailPage({ params }: PageProps) {
                 href={isProductOutOfStock ? '#' : `https://wa.me/${whatsappNumber}?text=${whatsappMessage}`}
                 target={isProductOutOfStock ? undefined : "_blank"}
                 rel={isProductOutOfStock ? undefined : "noopener noreferrer"}
+                onClick={() => {
+                  if (!isProductOutOfStock) {
+                    trackFbEvent('Contact', {
+                      content_name: product.title,
+                      content_category: product.category,
+                      content_ids: [String(product.id)],
+                      value: finalPrice,
+                      currency: 'USD'
+                    });
+                  }
+                }}
                 className={`w-full font-extrabold py-4 rounded-xl transition shadow-lg text-sm flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#20b858] text-white shadow-[0_0_20px_rgba(37,211,102,0.3)] disabled:opacity-50 disabled:cursor-not-allowed ${
                   (isProductOutOfStock || !selectedVariant || selectedVariant.stock_quantity === 0) ? 'pointer-events-none opacity-50 grayscale' : ''
                 }`}

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { ShoppingCart, Award, Clock } from 'lucide-react';
 import { useCartStore } from '@/store/cart';
+import { trackFbEvent } from '@/lib/fbPixel';
 
 interface ProductCardProps {
   id: string | number;
@@ -53,6 +54,16 @@ export default function ProductCard({
       image: imageUrl || 'https://images.unsplash.com/photo-1583318433420-532155e9d9e4?q=80&w=500&auto=format&fit=crop',
       quantity: 1,
       loyalty_points_earned: finalPoints
+    });
+
+    // إرسال حدث AddToCart إلى Meta Pixel
+    trackFbEvent('AddToCart', {
+      content_name: title,
+      content_category: category,
+      content_ids: [String(id)],
+      content_type: 'product',
+      value: parseFloat(price) || 0,
+      currency: 'USD'
     });
 
     alert(isPreOrder ? `✅ Added to cart as Pre-Order (+${finalPoints} PTS)` : `✅ Added to cart (+${finalPoints} PTS)`);

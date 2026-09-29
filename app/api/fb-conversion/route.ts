@@ -6,8 +6,8 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { eventName, eventId, customData, userData, sourceUrl } = body;
 
-    const PIXEL_ID = process.env.NEXT_PUBLIC_FB_PIXEL_ID;
-    const TOKEN = process.env.FB_CONVERSIONS_API_TOKEN;
+    const PIXEL_ID = process.env.NEXT_PUBLIC_FB_PIXEL_ID || '1722417688864625';
+    const TOKEN = process.env.FB_CONVERSIONS_API_TOKEN || 'EAAyWeNcT5owBSnCGRZCa7pqBFQPdOMch6DG6MoNZBGhyuY3ZCKpctoPah7ZCMb2sBumSSfhZCszXFtUIOkiFw0D8puWyMX5VGnRxC8Qu1RwKb4ArUEuq4mEGOiOF9TWoAkS9agcemMA1R6U9RKykTPi6s2Hswplji80mNLAFWuTWi78pQ7lMf2gsghX38nwZDZD';
 
     if (!PIXEL_ID || !TOKEN) {
       return NextResponse.json({ error: 'Missing Meta Pixel credentials' }, { status: 500 });

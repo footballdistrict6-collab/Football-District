@@ -50,6 +50,35 @@ function CatalogContent() {
     if (selectedTab !== 'All' && selectedTab !== 'Kits') {
       if (isLeagueTab) {
         matchesTab = p.league === selectedTab;
+      } else if (selectedTab === 'Winter Collection') {
+        // قسم مجموعة الشتاء الشامل
+        matchesTab = 
+          p.category === 'Winter Collection' ||
+          p.category === 'Puffer Jackets' ||
+          p.category === 'Full Sets' ||
+          p.category === 'Sweatshirts' ||
+          p.category === 'Long Sleeve' ||
+          p.category === 'Training Suits' ||
+          p.category === 'Windbreakers' ||
+          p.title?.toLowerCase().includes('full set') ||
+          p.title?.toLowerCase().includes('sweatshirt') ||
+          p.title?.toLowerCase().includes('puffer') ||
+          p.title?.toLowerCase().includes('windbreaker');
+      } else if (selectedTab === 'Puffer Jackets') {
+        matchesTab = p.category === 'Puffer Jackets' || p.title?.toLowerCase().includes('puffer');
+      } else if (selectedTab === 'Full Sets') {
+        matchesTab = p.category === 'Full Sets' || p.title?.toLowerCase().includes('full set');
+      } else if (selectedTab === 'Sweatshirts') {
+        matchesTab = p.category === 'Sweatshirts' || p.title?.toLowerCase().includes('sweatshirt');
+      } else if (selectedTab === 'Special Orders' || selectedTab === 'Pre-Order') {
+        matchesTab = 
+          p.category === 'Special Orders' || 
+          p.category === 'Pre-Order' || 
+          p.category?.toLowerCase().includes('special') || 
+          p.category?.toLowerCase().includes('pre-order') || 
+          p.category?.toLowerCase().includes('preorder') ||
+          p.title?.toLowerCase().includes('pre-order') ||
+          p.title?.toLowerCase().includes('preorder');
       } else {
         matchesTab = p.category === selectedTab;
       }
@@ -59,9 +88,14 @@ function CatalogContent() {
     return matchesTab && matchesSearch;
   });
 
-  // تمت إضافة Kids إلى مصفوفة الفلترة هنا
+  // مصفوفة الفلترة المحدثة
   const filterTabs = [
     'All',
+    'Winter Collection',
+    'Puffer Jackets',
+    'Full Sets',
+    'Sweatshirts',
+    'Special Orders',
     'Premier League',
     'La Liga',
     'Serie A',
@@ -69,7 +103,6 @@ function CatalogContent() {
     'Ligue 1',
     'Retro Kits',
     'Kids',
-    'Special Orders',
     'Boots',
     'Equipment',
     'Mystery Drop'
@@ -86,16 +119,34 @@ function CatalogContent() {
               ? `SEARCH RESULTS FOR: "${urlSearch}"` 
               : selectedTab === 'All' 
                 ? '26/27 CATALOG' 
-                : selectedTab === 'Kids' 
-                  ? 'KIDS KITS 👶'
-                  : selectedTab.toUpperCase()}
+                : selectedTab === 'Winter Collection'
+                  ? 'WINTER COLLECTION ❄️'
+                  : selectedTab === 'Puffer Jackets'
+                    ? 'PUFFER JACKETS 🧥'
+                    : selectedTab === 'Full Sets'
+                      ? 'FULL SETS ⚽'
+                      : selectedTab === 'Sweatshirts'
+                        ? 'SWEATSHIRTS 👕'
+                        : selectedTab === 'Special Orders'
+                          ? 'PRE-ORDER & SPECIAL ORDERS ✈️'
+                          : selectedTab === 'Kids' 
+                            ? 'KIDS KITS 👶'
+                            : selectedTab.toUpperCase()}
           </h1>
           <p className="text-gray-400">
-            {selectedTab === 'Special Orders'
-              ? '✈️ Custom pre-order jerseys. Estimated delivery time applies.'
-              : selectedTab === 'Kids'
-                ? '👶 Shop official football kits and gear for the little champions.'
-                : 'Browse our official kits, footwear, and professional gear.'}
+            {selectedTab === 'Special Orders' || selectedTab === 'Pre-Order'
+              ? '✈️ Custom pre-order jerseys and special editions. Estimated delivery time applies.'
+              : selectedTab === 'Winter Collection'
+                ? '❄️ Stay warm with our official winter gear, puffer jackets, full tracksuits, and sweatshirts.'
+                : selectedTab === 'Puffer Jackets'
+                  ? '🧥 Premium insulated club puffer jackets designed for warmth and street style.'
+                  : selectedTab === 'Full Sets'
+                    ? '⚽ Official full tracksuits and matching training sets.'
+                    : selectedTab === 'Sweatshirts'
+                      ? '👕 Comfortable club crewnecks, sweatshirts, and fleece pullovers.'
+                      : selectedTab === 'Kids'
+                        ? '👶 Shop official football kits and gear for the little champions.'
+                        : 'Browse our official kits, footwear, and professional gear.'}
           </p>
         </div>
 
@@ -105,13 +156,19 @@ function CatalogContent() {
             <button
               key={tab}
               onClick={() => setSelectedTab(tab)}
-              className={`px-4 py-2 rounded-full text-xs md:text-sm font-semibold transition flex items-center gap-1 ${
+              className={`px-4 py-2 rounded-full text-xs md:text-sm font-semibold transition flex items-center gap-1.5 ${
                 selectedTab === tab
                   ? 'bg-[#00AEEF] text-white shadow-[0_0_15px_rgba(0,174,239,0.3)]'
                   : 'bg-[#121212] text-gray-400 hover:text-white hover:bg-[#1a1a1a] border border-[#1f1f1f]'
               }`}
             >
-              {tab === 'Special Orders' ? '✈️ Special Orders' : tab === 'Kids' ? '👶 Kids' : tab}
+              {tab === 'Winter Collection' ? '❄️ Winter Collection'
+                : tab === 'Puffer Jackets' ? '🧥 Puffer Jackets'
+                : tab === 'Full Sets' ? '⚽ Full Sets'
+                : tab === 'Sweatshirts' ? '👕 Sweatshirts'
+                : tab === 'Special Orders' ? '✈️ Pre-Orders' 
+                : tab === 'Kids' ? '👶 Kids' 
+                : tab}
             </button>
           ))}
         </div>
@@ -142,6 +199,7 @@ function CatalogContent() {
                   category={product.category || 'Kits'}
                   imageUrl={imgUrl}
                   loyaltyPoints={Number(product.loyalty_points_earned) || 20}
+                  inStock={product.in_stock !== false}
                 />
               );
             })}

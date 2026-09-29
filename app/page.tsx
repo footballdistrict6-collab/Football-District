@@ -230,6 +230,7 @@ export default function HomePage() {
                   imageUrl={imgUrl}
                   // تمرير النقاط الحقيقية لتتطابق تماماً مع الكتالوج
                   loyaltyPoints={Number(product.loyalty_points_earned) > 0 ? Number(product.loyalty_points_earned) : 20}
+                  inStock={product.in_stock !== false}
                 />
               );
             })}

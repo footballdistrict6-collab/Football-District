@@ -133,8 +133,19 @@ export default function ProductDetailPage({ params }: PageProps) {
   const mainImage = galleryImages[activeImageIndex] || galleryImages[0];
 
   const categoryLower = product.category?.toLowerCase() || '';
-  const isSpecialOrder = product.category === 'Special Orders' || categoryLower.includes('special');
+  const isPreOrder = 
+    product.category === 'Special Orders' || 
+    product.category === 'Pre-Order' || 
+    categoryLower.includes('special') || 
+    categoryLower.includes('pre-order') || 
+    categoryLower.includes('preorder') ||
+    product.title?.toLowerCase().includes('pre-order') ||
+    product.title?.toLowerCase().includes('preorder');
   
+  const isProductOutOfStock = 
+    product.in_stock === false || 
+    (variants.length > 0 && variants.every(v => Number(v.stock_quantity) === 0));
+
   const isBootCategory = categoryLower.includes('boot') || product.category === 'Boots';
   const isKidsCategory = categoryLower === 'kids' || categoryLower.includes('kids');
   const isPrintable = product.category === 'Kits' || product.category === 'Retro Kits' || isKidsCategory || categoryLower.includes('jersey');
@@ -144,6 +155,11 @@ export default function ProductDetailPage({ params }: PageProps) {
 
   // --- دالة إضافة المنتج للسلة ---
   const handleAddToCart = () => {
+    if (isProductOutOfStock) {
+      alert('⚠️ Sorry, this product is currently Out of Stock.');
+      return;
+    }
+
     if (isCustomized && (!customName.trim() || !customNumber.trim())) {
       alert('⚠️ Please enter both the Name and Number for your custom print.');
       return;
@@ -155,7 +171,7 @@ export default function ProductDetailPage({ params }: PageProps) {
       ? `${product.id}-${selectedSize}-PRINT-${customName}-${customNumber}` 
       : `${product.id}-${selectedSize}`;
       
-    const preOrderTag = isSpecialOrder ? '[Pre-Order] ' : '';
+    const preOrderTag = isPreOrder ? '[Pre-Order] ' : '';
     const printTag = isCustomized ? ` | Print: ${customName} #${customNumber}` : '';
     const cartItemTitle = `${preOrderTag}${product.title} (Size: ${selectedSize})${printTag}`;
 
@@ -177,9 +193,10 @@ export default function ProductDetailPage({ params }: PageProps) {
   // --- إعداد رسالة الواتساب للطلب المباشر ---
   const whatsappMessage = encodeURIComponent(
     `Hello! I would like to order from the website:\n\n` +
-    `🏆 Product: ${product.title}\n` +
+    `🏆 Product: ${isPreOrder ? '[PRE-ORDER] ' : ''}${product.title}\n` +
     `📏 Size: ${selectedSize}\n` +
     `💵 Price: $${finalPrice.toFixed(2)}\n` +
+    `${isPreOrder ? `✈️ Status: PRE-ORDER\n` : ''}` +
     `${isCustomized ? `👕 Customization: YES (Name: ${customName}, No:${customNumber})\n` : ''}` +
     `\nPlease confirm availability and total.`
   );
@@ -198,12 +215,22 @@ export default function ProductDetailPage({ params }: PageProps) {
           {/* قسم الصور */}
           <div className="lg:col-span-7 space-y-4">
             <div className="relative h-[450px] md:h-[550px] bg-[#121212] border border-[#1f1f1f] rounded-2xl overflow-hidden flex items-center justify-center">
-              <img src={mainImage} alt={product.title} className="object-cover h-full w-full opacity-90 hover:opacity-100 transition duration-500" />
-              {isSpecialOrder && (
-                <span className="absolute top-4 left-4 bg-purple-950/90 text-purple-300 border border-purple-500/50 text-xs font-extrabold px-3 py-1.5 rounded-lg flex items-center gap-1.5 shadow-xl">
-                  <Clock className="w-4 h-4" /> PRE-ORDER ITEM
+              <img src={mainImage} alt={product.title} className={`object-cover h-full w-full transition duration-500 ${isProductOutOfStock ? 'grayscale-[30%] opacity-70' : 'opacity-90 hover:opacity-100'}`} />
+              
+              {/* شارة Pre-Order الواضحة والمميزة */}
+              {isPreOrder && (
+                <span className="absolute top-4 left-4 bg-purple-600 text-white border border-purple-400/60 text-xs font-black tracking-wider uppercase px-3.5 py-1.5 rounded-lg flex items-center gap-2 shadow-[0_0_20px_rgba(168,85,247,0.5)] z-10">
+                  <Clock className="w-4 h-4 stroke-[2.5]" /> PRE-ORDER
                 </span>
               )}
+
+              {/* شارة Out of Stock */}
+              {isProductOutOfStock && (
+                <span className="absolute top-4 right-4 bg-red-600 text-white text-xs font-black tracking-wider uppercase px-3.5 py-1.5 rounded-lg border border-red-400/50 shadow-xl z-10">
+                  OUT OF STOCK
+                </span>
+              )}
+
               <span className="absolute bottom-4 right-4 bg-black/80 text-amber-400 border border-amber-500/30 text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 shadow-lg">
                 <Award className="w-4 h-4" /> +{Number(product.loyalty_points_earned) > 0 ? Number(product.loyalty_points_earned) : 20} PTS
               </span>
@@ -224,9 +251,22 @@ export default function ProductDetailPage({ params }: PageProps) {
           <div className="lg:col-span-5 bg-[#121212] p-6 md:p-8 rounded-2xl border border-[#1f1f1f] space-y-6 sticky top-24">
             
             <div className="flex items-center gap-2 flex-wrap">
-              <span className={`text-xs font-extrabold uppercase px-3 py-1 rounded-full border ${isSpecialOrder ? 'bg-purple-950/60 text-purple-400 border-purple-500/40' : 'bg-[#1a1a1a] text-[#00AEEF] border-[#333]'}`}>
+              <span className={`text-xs font-extrabold uppercase px-3 py-1 rounded-full border ${isPreOrder ? 'bg-purple-950/60 text-purple-400 border-purple-500/40' : 'bg-[#1a1a1a] text-[#00AEEF] border-[#333]'}`}>
                 {product.category || 'Kits'}
               </span>
+
+              {isPreOrder && (
+                <span className="text-xs font-black uppercase px-3 py-1 rounded-full bg-purple-600 text-white border border-purple-400/50 flex items-center gap-1.5 shadow-[0_0_12px_rgba(168,85,247,0.3)]">
+                  <Clock className="w-3.5 h-3.5 stroke-[2.5]" /> PRE-ORDER
+                </span>
+              )}
+
+              {isProductOutOfStock && (
+                <span className="text-xs font-bold uppercase px-3 py-1 rounded-full bg-red-950/80 text-red-300 border border-red-500/40">
+                  OUT OF STOCK
+                </span>
+              )}
+
               {product.league && (
                 <span className="text-xs font-bold uppercase px-3 py-1 rounded-full bg-[#1a1a1a] text-gray-300 border border-[#333]">
                   ⚽ {product.league}
@@ -245,6 +285,21 @@ export default function ProductDetailPage({ params }: PageProps) {
               </div>
             </div>
 
+            {/* تنبيه منتجات الـ Pre-Order */}
+            {isPreOrder && (
+              <div className="bg-purple-950/40 border border-purple-500/40 rounded-xl p-3.5 text-xs text-purple-200 flex items-center gap-3">
+                <Clock className="w-4 h-4 text-purple-400 shrink-0" />
+                <span><strong>PRE-ORDER ITEM:</strong> This item is custom-ordered upon request. Estimated delivery time applies.</span>
+              </div>
+            )}
+
+            {/* تنبيه نفاذ المخزون */}
+            {isProductOutOfStock && (
+              <div className="bg-red-950/40 border border-red-500/40 rounded-xl p-3.5 text-xs text-red-300 flex items-center gap-2.5">
+                <span>⚠️ <strong>Currently Out of Stock:</strong> This item has reached 0 inventory or is temporarily unavailable.</span>
+              </div>
+            )}
+
             {/* قسم المقاسات (ديناميكي ومرتبط بالمخزون) */}
             <div className="border-t border-[#222] pt-6">
               <div className="flex justify-between items-center mb-3">
@@ -262,7 +317,7 @@ export default function ProductDetailPage({ params }: PageProps) {
               </div>
               <div className="flex flex-wrap gap-3">
                 {variants.map((v) => {
-                  const isOutOfStock = v.stock_quantity === 0;
+                  const isVariantOutOfStock = isProductOutOfStock || v.stock_quantity === 0;
                   const isLowStock = v.stock_quantity > 0 && v.stock_quantity <= (v.low_stock_threshold || 2);
                   const isSelected = selectedSize === v.size;
 
@@ -270,20 +325,20 @@ export default function ProductDetailPage({ params }: PageProps) {
                     <button 
                       key={v.id} 
                       type="button" 
-                      disabled={isOutOfStock}
+                      disabled={isVariantOutOfStock}
                       onClick={() => {
                         setSelectedSize(v.size);
                         setSelectedVariant(v);
                       }} 
                       className={`relative px-4 h-12 rounded-xl font-bold text-sm transition border flex items-center justify-center min-w-[3.5rem] 
-                        ${isOutOfStock ? 'bg-[#1a0505] text-gray-600 border-red-900/30 opacity-60 cursor-not-allowed line-through' 
+                        ${isVariantOutOfStock ? 'bg-[#1a0505] text-gray-600 border-red-900/30 opacity-60 cursor-not-allowed line-through' 
                         : isSelected ? 'bg-[#00AEEF] text-white border-[#00AEEF] shadow-[0_0_15px_rgba(0,174,239,0.4)]' 
                         : 'bg-[#1a1a1a] text-gray-300 border-[#2b2b2b] hover:border-gray-500'}`}
                     >
                       {v.size}
                       
                       {/* علامة Low Stock الذكية */}
-                      {isLowStock && !isOutOfStock && (
+                      {isLowStock && !isVariantOutOfStock && (
                         <span className="absolute -top-2 -right-2 bg-red-600 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow whitespace-nowrap">
                           Only {v.stock_quantity}
                         </span>
@@ -292,7 +347,7 @@ export default function ProductDetailPage({ params }: PageProps) {
                   );
                 })}
               </div>
-              {(!selectedVariant || selectedVariant.stock_quantity === 0) && (
+              {(!selectedVariant || selectedVariant.stock_quantity === 0 || isProductOutOfStock) && (
                 <p className="text-red-400 text-xs font-bold mt-3">⚠️ This size is currently Out of Stock.</p>
               )}
             </div>
@@ -353,27 +408,37 @@ export default function ProductDetailPage({ params }: PageProps) {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
               <button
                 onClick={handleAddToCart}
-                disabled={addedToCart || !selectedVariant || selectedVariant.stock_quantity === 0}
+                disabled={isProductOutOfStock || addedToCart || !selectedVariant || selectedVariant.stock_quantity === 0}
                 className={`w-full font-extrabold py-4 rounded-xl transition shadow-lg text-sm flex items-center justify-center gap-2 ${
-                  addedToCart 
-                    ? 'bg-green-600 text-white shadow-[0_0_20px_rgba(22,163,74,0.4)]' 
-                    : 'bg-[#00AEEF] hover:bg-blue-500 text-white shadow-[0_0_20px_rgba(0,174,239,0.3)]'
+                  isProductOutOfStock 
+                    ? 'bg-[#222] text-gray-600 cursor-not-allowed'
+                    : addedToCart 
+                      ? 'bg-green-600 text-white shadow-[0_0_20px_rgba(22,163,74,0.4)]' 
+                      : isPreOrder
+                        ? 'bg-purple-600 hover:bg-purple-500 text-white shadow-[0_0_20px_rgba(147,51,234,0.4)]'
+                        : 'bg-[#00AEEF] hover:bg-blue-500 text-white shadow-[0_0_20px_rgba(0,174,239,0.3)]'
                 } disabled:opacity-50 disabled:cursor-not-allowed`}
               >
-                {addedToCart ? (
+                {isProductOutOfStock ? (
+                  <>Out of Stock</>
+                ) : addedToCart ? (
                   <><CheckCircle2 className="w-5 h-5 animate-bounce" /> Added to Cart!</>
+                ) : isPreOrder ? (
+                  <><Clock className="w-5 h-5" /> Pre-Order Now — ${finalPrice.toFixed(2)}</>
                 ) : (
                   <><ShoppingCart className="w-5 h-5" /> Add to Cart — ${finalPrice.toFixed(2)}</>
                 )}
               </button>
 
               <a
-                href={`https://wa.me/${whatsappNumber}?text=${whatsappMessage}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={`w-full font-extrabold py-4 rounded-xl transition shadow-lg text-sm flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#20b858] text-white shadow-[0_0_20px_rgba(37,211,102,0.3)] disabled:opacity-50 disabled:cursor-not-allowed ${(!selectedVariant || selectedVariant.stock_quantity === 0) ? 'pointer-events-none opacity-50 grayscale' : ''}`}
+                href={isProductOutOfStock ? '#' : `https://wa.me/${whatsappNumber}?text=${whatsappMessage}`}
+                target={isProductOutOfStock ? undefined : "_blank"}
+                rel={isProductOutOfStock ? undefined : "noopener noreferrer"}
+                className={`w-full font-extrabold py-4 rounded-xl transition shadow-lg text-sm flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#20b858] text-white shadow-[0_0_20px_rgba(37,211,102,0.3)] disabled:opacity-50 disabled:cursor-not-allowed ${
+                  (isProductOutOfStock || !selectedVariant || selectedVariant.stock_quantity === 0) ? 'pointer-events-none opacity-50 grayscale' : ''
+                }`}
               >
-                <MessageCircle className="w-5 h-5" /> Order on WhatsApp
+                <MessageCircle className="w-5 h-5" /> {isPreOrder ? 'Pre-Order on WhatsApp' : 'Order on WhatsApp'}
               </a>
             </div>
 

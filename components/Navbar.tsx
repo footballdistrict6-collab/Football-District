@@ -122,7 +122,7 @@ export default function Navbar() {
             )}
           </div>
 
-          {/* 2. قائمة الشتاء المنسدلة (Winter Collection) المضافة حديثاً */}
+          {/* 2. قائمة الشتاء المنسدلة (Winter Collection) */}
           <div 
             className="relative"
             onMouseEnter={() => setWinterDropdownOpen(true)}
@@ -132,31 +132,47 @@ export default function Navbar() {
               href="/catalog?category=Winter+Collection" 
               className="flex items-center gap-1.5 py-4 text-gray-300 hover:text-amber-400 transition"
             >
-              <span>Winter</span>
+              <span>Winter Collection</span>
               <span className="text-[9px] bg-amber-500/20 text-amber-400 border border-amber-500/40 px-1.5 py-0.5 rounded font-black tracking-wider shadow-[0_0_10px_rgba(251,191,36,0.2)]">NEW</span>
               <ChevronDown className={`w-4 h-4 transition-transform ${winterDropdownOpen ? 'rotate-180 text-amber-400' : ''}`} />
             </Link>
 
             {winterDropdownOpen && (
               <div className="absolute top-full left-0 w-64 bg-[#121212] border border-[#222] rounded-2xl shadow-2xl py-3 z-50">
-                
-                <Link href="/catalog?category=Winter+Collection&sort=new" className="block px-4 py-3 text-xs font-black text-amber-400 hover:bg-[#1a1a1a] transition border-b border-[#222] mb-1">
-                  <span className="flex items-center gap-2"><Sparkles className="w-3.5 h-3.5" /> Winter - New Arrivals</span>
+                <Link 
+                  href="/catalog?category=Winter+Collection" 
+                  className="block px-4 py-3 text-xs font-black text-amber-400 hover:bg-[#1a1a1a] transition border-b border-[#222] mb-1"
+                >
+                  <span className="flex items-center gap-2"><Snowflake className="w-3.5 h-3.5 text-amber-400" /> Winter Collection (All)</span>
                 </Link>
                 
-                <Link href="/catalog?category=Long+Sleeve" className="block px-4 py-2 text-xs font-bold text-gray-300 hover:text-white hover:bg-[#1a1a1a] transition">
-                  Long Sleeve Jerseys
+                <Link 
+                  href="/catalog?category=Puffer+Jackets" 
+                  className="block px-4 py-2.5 text-xs font-bold text-gray-300 hover:text-white hover:bg-[#1a1a1a] transition flex items-center justify-between"
+                >
+                  <span>🧥 Puffer Jackets</span>
+                  <span className="text-[9px] bg-amber-500/10 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded font-bold">HOT</span>
                 </Link>
-                <Link href="/catalog?category=Training+Suits" className="block px-4 py-2 text-xs font-bold text-gray-300 hover:text-white hover:bg-[#1a1a1a] transition">
-                  Training Suits <span className="text-gray-500 font-medium">(Full Sets)</span>
+                <Link 
+                  href="/catalog?category=Full+Sets" 
+                  className="block px-4 py-2.5 text-xs font-bold text-gray-300 hover:text-white hover:bg-[#1a1a1a] transition flex items-center justify-between"
+                >
+                  <span>⚽ Full Sets</span>
+                  <span className="text-[9px] bg-[#00AEEF]/10 text-[#00AEEF] border border-[#00AEEF]/30 px-1.5 py-0.5 rounded font-bold">POPULAR</span>
                 </Link>
-                <Link href="/catalog?category=Windbreakers" className="block px-4 py-2 text-xs font-bold text-gray-300 hover:text-white hover:bg-[#1a1a1a] transition">
-                  Windbreakers
+                <Link 
+                  href="/catalog?category=Sweatshirts" 
+                  className="block px-4 py-2.5 text-xs font-bold text-gray-300 hover:text-white hover:bg-[#1a1a1a] transition flex items-center justify-between"
+                >
+                  <span>👕 Sweatshirts</span>
                 </Link>
                 
                 <div className="border-t border-[#222] my-1 pt-1 mt-2">
-                  <Link href="/catalog?category=Winter+Collection" className="block px-4 py-2.5 text-xs font-bold text-gray-400 hover:text-white hover:bg-[#1a1a1a] transition text-center uppercase tracking-widest">
-                    Shop All Winter
+                  <Link 
+                    href="/catalog?category=Winter+Collection" 
+                    className="block px-4 py-2 text-xs font-bold text-gray-400 hover:text-white hover:bg-[#1a1a1a] transition text-center uppercase tracking-widest"
+                  >
+                    Shop All Winter &rarr;
                   </Link>
                 </div>
               </div>
@@ -268,14 +284,14 @@ export default function Navbar() {
                   <span>&rarr;</span>
                 </Link>
 
-                {/* --- قسم مجموعة الشتاء المضاف حديثاً (Winter Collection - Mobile) --- */}
+                {/* --- قسم مجموعة الشتاء (Winter Collection - Mobile) --- */}
                 <div className="py-2">
                   <button
                     onClick={() => setMobileWinterOpen(!mobileWinterOpen)}
                     className="w-full py-2.5 flex items-center justify-between text-amber-400 hover:text-amber-300"
                   >
                     <span className="flex items-center gap-2">
-                      <Snowflake className="w-4 h-4 text-amber-400" /> Winter
+                      <Snowflake className="w-4 h-4 text-amber-400" /> Winter Collection
                       <span className="text-[9px] bg-amber-500/20 text-amber-400 border border-amber-500/40 px-1.5 py-0.5 rounded font-black">NEW</span>
                     </span>
                     <ChevronDown className={`w-4 h-4 transition-transform duration-300 ${mobileWinterOpen ? 'rotate-180 text-amber-400' : ''}`} />
@@ -284,19 +300,43 @@ export default function Navbar() {
                   {mobileWinterOpen && (
                     <div className="pl-4 pr-2 py-2 space-y-2 border-l-2 border-amber-500/40 my-1 ml-2 text-xs">
                       <Link
-                        href="/catalog?category=Winter+Collection&sort=new"
+                        href="/catalog?category=Winter+Collection"
                         onClick={() => setMobileMenuOpen(false)}
                         className="block py-2 text-amber-400 font-bold border-b border-[#222] mb-2"
                       >
-                        ✨ Winter - New Arrivals
+                        ❄️ All Winter Collection
                       </Link>
-                      <Link href="/catalog?category=Long+Sleeve" onClick={() => setMobileMenuOpen(false)} className="block py-1.5 text-gray-300 hover:text-white">&bull; Long Sleeve Jerseys</Link>
-                      <Link href="/catalog?category=Training+Suits" onClick={() => setMobileMenuOpen(false)} className="block py-1.5 text-gray-300 hover:text-white">&bull; Training Suits (Full Sets)</Link>
-                      <Link href="/catalog?category=Windbreakers" onClick={() => setMobileMenuOpen(false)} className="block py-1.5 text-gray-300 hover:text-white">&bull; Windbreakers</Link>
+                      <Link 
+                        href="/catalog?category=Puffer+Jackets" 
+                        onClick={() => setMobileMenuOpen(false)} 
+                        className="block py-2 text-gray-300 hover:text-white font-medium flex items-center justify-between"
+                      >
+                        <span>🧥 Puffer Jackets</span>
+                        <span className="text-[9px] bg-amber-500/10 text-amber-400 border border-amber-500/30 px-1.5 py-0.5 rounded font-bold">HOT</span>
+                      </Link>
+                      <Link 
+                        href="/catalog?category=Full+Sets" 
+                        onClick={() => setMobileMenuOpen(false)} 
+                        className="block py-2 text-gray-300 hover:text-white font-medium flex items-center justify-between"
+                      >
+                        <span>⚽ Full Sets</span>
+                        <span className="text-[9px] bg-[#00AEEF]/10 text-[#00AEEF] border border-[#00AEEF]/30 px-1.5 py-0.5 rounded font-bold">POPULAR</span>
+                      </Link>
+                      <Link 
+                        href="/catalog?category=Sweatshirts" 
+                        onClick={() => setMobileMenuOpen(false)} 
+                        className="block py-2 text-gray-300 hover:text-white font-medium"
+                      >
+                        <span>👕 Sweatshirts</span>
+                      </Link>
                       
                       <div className="border-t border-[#222] pt-2 mt-2">
-                        <Link href="/catalog?category=Winter+Collection" onClick={() => setMobileMenuOpen(false)} className="block py-1.5 text-center text-gray-400 hover:text-white font-bold tracking-widest uppercase">
-                          Shop All Winter
+                        <Link 
+                          href="/catalog?category=Winter+Collection" 
+                          onClick={() => setMobileMenuOpen(false)} 
+                          className="block py-1.5 text-center text-gray-400 hover:text-white font-bold tracking-widest uppercase"
+                        >
+                          Shop All Winter &rarr;
                         </Link>
                       </div>
                     </div>

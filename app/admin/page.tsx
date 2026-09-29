@@ -30,7 +30,23 @@ import {
   Box
 } from 'lucide-react';
 
-const STORE_CATEGORIES = ['Kits', 'Retro Kits', 'Kids', 'Special Orders', 'Boots', 'Equipment', 'Mystery Drop', 'Winter Collection', 'Long Sleeve', 'Training Suits', 'Windbreakers'];
+const STORE_CATEGORIES = [
+  'Kits', 
+  'Retro Kits', 
+  'Kids', 
+  'Winter Collection', 
+  'Puffer Jackets', 
+  'Full Sets', 
+  'Sweatshirts', 
+  'Special Orders', 
+  'Pre-Order', 
+  'Boots', 
+  'Equipment', 
+  'Mystery Drop', 
+  'Long Sleeve', 
+  'Training Suits', 
+  'Windbreakers'
+];
 
 // المصفوفات الثابتة للمقاسات لتوليدها أوتوماتيكياً
 const KIT_SIZES = ['S', 'M', 'L', 'XL', 'XXL'];
@@ -54,7 +70,7 @@ export default function AdminDashboard() {
   const [editingProduct, setEditingProduct] = useState<any | null>(null);
 
   const [newProduct, setNewProduct] = useState({
-    title: '', price: '', category: 'Kits', league: 'Premier League', imageUrl: '', loyalty_points_earned: 20
+    title: '', price: '', category: 'Kits', league: 'Premier League', imageUrl: '', loyalty_points_earned: 20, initial_stock: 10
   });
 
   const [newPromo, setNewPromo] = useState({
@@ -115,7 +131,7 @@ export default function AdminDashboard() {
   const websiteOrdersCount = orders.filter(o => o.source === 'Website' || !o.source).length;
   const whatsappOrdersCount = orders.filter(o => o.source === 'WhatsApp').length;
 
-  // --- الدالة المحدثة: إضافة منتج فردي + توليد مقاساته أوتوماتيكياً ---
+  // --- الدالة المحدثة: إضافة منتج فردي + توليد مقاساته أوتوماتيكياً بحالة In Stock ---
   const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newProduct.title || !newProduct.price) return alert("⚠️ يرجى إدخال عنوان المنتج وسعره!");
@@ -140,23 +156,25 @@ export default function AdminDashboard() {
       if (categoryLower.includes('boot') || newProduct.category === 'Boots') sizesToCreate = BOOT_SIZES;
       else if (categoryLower === 'kids' || categoryLower.includes('kids')) sizesToCreate = KIDS_SIZES;
 
+      const defaultStockQty = Number(newProduct.initial_stock) > 0 ? Number(newProduct.initial_stock) : 10;
+
       const variantsToInsert = sizesToCreate.map(size => ({
         product_id: insertedProduct.id,
         size: size,
-        stock_quantity: 0, // الرصيد المبدئي 0
+        stock_quantity: defaultStockQty, // الرصيد المبدئي In Stock تلقائياً
         low_stock_threshold: 2
       }));
 
       // 3. إدخال المقاسات في جدول المخزون
       await supabase.from('product_variants').insert(variantsToInsert);
 
-      alert("✅ تم إضافة المنتج وتوليد مقاساته في قسم المخزون (Inventory) بنجاح!"); 
-      setNewProduct({ title: '', price: '', category: 'Kits', league: 'Premier League', imageUrl: '', loyalty_points_earned: 20 }); 
+      alert("✅ تم إضافة المنتج وتوليد مقاساته في قسم المخزون بحالة In Stock بنجاح!"); 
+      setNewProduct({ title: '', price: '', category: 'Kits', league: 'Premier League', imageUrl: '', loyalty_points_earned: 20, initial_stock: 10 }); 
       fetchData();
     }
   };
 
-  // --- الدالة المحدثة: رفع المنتجات عبر إكسل + توليد مقاساتها أوتوماتيكياً ---
+  // --- الدالة المحدثة: رفع المنتجات عبر إكسل + توليد مقاساتها أوتوماتيكياً بحالة In Stock ---
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -169,34 +187,46 @@ export default function AdminDashboard() {
         const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
         if (jsonData.length === 0) return alert("⚠️ The Excel file is empty.");
 
-        const formattedProducts = jsonData.map((row: any) => ({
-          title: row.Title || row.title || 'Unnamed', price: parseFloat(row.Price || row.price) || 0,
-          category: row.Category || row.category || 'Kits', league: row.League || row.league || '',
-          image_url: row.ImageUrl || row.image_url || 'https://images.unsplash.com/photo-1583318433420-532155e9d9e4',
-          image_urls: row.ImageUrl || row.image_url ? [row.ImageUrl || row.image_url] : [],
-          loyalty_points_earned: parseInt(row.Points || row.loyalty_points_earned) || 20,
-          in_stock: row.InStock !== undefined ? String(row.InStock).toLowerCase() === 'true' : true
-        }));
+        const parsedProducts = jsonData.map((row: any) => {
+          const rowStock = row.Stock !== undefined ? row.Stock : row.Quantity !== undefined ? row.Quantity : row.stock_quantity;
+          const parsedStock = rowStock !== undefined && !isNaN(parseInt(rowStock)) ? parseInt(rowStock) : 10;
+          return {
+            product: {
+              title: row.Title || row.title || 'Unnamed', 
+              price: parseFloat(row.Price || row.price) || 0,
+              category: row.Category || row.category || 'Kits', 
+              league: row.League || row.league || '',
+              image_url: row.ImageUrl || row.image_url || 'https://images.unsplash.com/photo-1583318433420-532155e9d9e4',
+              image_urls: row.ImageUrl || row.image_url ? [row.ImageUrl || row.image_url] : [],
+              loyalty_points_earned: parseInt(row.Points || row.loyalty_points_earned) || 20,
+              in_stock: row.InStock !== undefined ? String(row.InStock).toLowerCase() === 'true' : true
+            },
+            initial_stock: parsedStock > 0 ? parsedStock : 10
+          };
+        });
 
         // 1. إدخال كل المنتجات دفعة واحدة واسترجاع بياناتها
+        const formattedProducts = parsedProducts.map(p => p.product);
         const { data: insertedProducts, error } = await supabase.from('products').insert(formattedProducts).select();
         
         if (error) throw error;
 
-        // 2. تجهيز المقاسات لكل منتج تم إدخاله
+        // 2. تجهيز المقاسات لكل منتج تم إدخاله برصيد In Stock تلقائياً
         let allVariantsToInsert: any[] = [];
         if (insertedProducts && insertedProducts.length > 0) {
-          insertedProducts.forEach((prod) => {
+          insertedProducts.forEach((prod, idx) => {
             const catLower = prod.category?.toLowerCase() || '';
             let sizes = KIT_SIZES;
             if (catLower.includes('boot') || prod.category === 'Boots') sizes = BOOT_SIZES;
             else if (catLower === 'kids' || catLower.includes('kids')) sizes = KIDS_SIZES;
 
+            const defaultStock = parsedProducts[idx]?.initial_stock || 10;
+
             sizes.forEach(s => {
               allVariantsToInsert.push({
                 product_id: prod.id,
                 size: s,
-                stock_quantity: 0, // الرصيد المبدئي 0
+                stock_quantity: defaultStock, // الرصيد المبدئي In Stock تلقائياً
                 low_stock_threshold: 2
               });
             });
@@ -208,7 +238,7 @@ export default function AdminDashboard() {
           }
         }
 
-        alert(`✅ Successfully added ${formattedProducts.length} products and generated their sizes in Inventory!`); 
+        alert(`✅ Successfully added ${formattedProducts.length} products with In Stock status generated in Inventory!`); 
         fetchData();
       } catch (error: any) { alert("❌ Error: " + error.message); } 
       finally { setIsUploading(false); if (fileInputRef.current) fileInputRef.current.value = ''; }
@@ -474,9 +504,10 @@ export default function AdminDashboard() {
                   <form onSubmit={handleAddProduct} className="bg-[#121212] p-6 rounded-2xl border border-[#1f1f1f] space-y-4">
                     <h3 className="font-bold text-lg border-b border-[#222] pb-3 flex items-center gap-2"><Plus className="w-5 h-5 text-[#00AEEF]" /> Add Base Product</h3>
                     <input type="text" required value={newProduct.title} onChange={(e) => setNewProduct({ ...newProduct, title: e.target.value })} placeholder="Title (e.g. Arsenal Home)" className="w-full bg-[#1a1a1a] border border-[#333] rounded-lg p-3 text-white text-sm focus:border-[#00AEEF]" />
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-3 gap-3">
                       <input type="number" step="0.01" required value={newProduct.price} onChange={(e) => setNewProduct({ ...newProduct, price: e.target.value })} placeholder="Base Price ($)" className="w-full bg-[#1a1a1a] border border-[#333] rounded-lg p-3 text-white text-sm focus:border-[#00AEEF]" />
                       <input type="number" value={newProduct.loyalty_points_earned} onChange={(e) => setNewProduct({ ...newProduct, loyalty_points_earned: Number(e.target.value) })} placeholder="Loyalty Pts" className="w-full bg-[#1a1a1a] border border-[#333] rounded-lg p-3 text-white text-sm focus:border-[#00AEEF]" />
+                      <input type="number" min="0" value={newProduct.initial_stock} onChange={(e) => setNewProduct({ ...newProduct, initial_stock: Number(e.target.value) })} placeholder="Stock / Size" className="w-full bg-[#1a1a1a] border border-[#333] rounded-lg p-3 text-white text-sm focus:border-[#00AEEF]" title="Default Stock Quantity per Size (Default: 10)" />
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <select value={newProduct.category} onChange={(e) => setNewProduct({ ...newProduct, category: e.target.value })} className="w-full bg-[#1a1a1a] border border-[#333] rounded-lg p-3 text-white text-sm focus:border-[#00AEEF]">
@@ -487,12 +518,12 @@ export default function AdminDashboard() {
                       </select>
                     </div>
                     <input type="url" value={newProduct.imageUrl} onChange={(e) => setNewProduct({ ...newProduct, imageUrl: e.target.value })} placeholder="Image URL" className="w-full bg-[#1a1a1a] border border-[#333] rounded-lg p-3 text-white text-sm focus:border-[#00AEEF]" />
-                    <button type="submit" className="w-full bg-[#00AEEF] hover:bg-blue-500 text-white font-extrabold py-3 rounded-xl transition">+ Create Product & Sync Inventory</button>
+                    <button type="submit" className="w-full bg-[#00AEEF] hover:bg-blue-500 text-white font-extrabold py-3 rounded-xl transition">+ Create Product & Sync In-Stock Inventory</button>
                   </form>
 
                   <div className="bg-[#121212] p-6 rounded-2xl border border-[#1f1f1f] flex flex-col justify-center items-center text-center">
                     <h2 className="text-xl font-bold mb-2 flex items-center gap-2"><Upload className="w-5 h-5 text-[#00AEEF]" /> Bulk Upload via Excel</h2>
-                    <p className="text-gray-400 text-xs mb-6 max-w-sm leading-relaxed">Upload an Excel (.xlsx) or CSV file. Columns must include:<br/> <strong className="text-white">Title, Price, Category, League, ImageUrl, Points, InStock</strong></p>
+                    <p className="text-gray-400 text-xs mb-6 max-w-sm leading-relaxed">Upload an Excel (.xlsx) or CSV file. Columns can include:<br/> <strong className="text-white">Title, Price, Category, League, ImageUrl, Points, InStock, Stock</strong> (Default stock is 10, In Stock automatically)</p>
                     <input type="file" accept=".xlsx, .xls, .csv" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
                     <button onClick={() => fileInputRef.current?.click()} disabled={isUploading} className={`w-full py-5 border-2 border-dashed rounded-2xl font-bold transition flex items-center justify-center gap-3 ${isUploading ? 'border-gray-600 text-gray-500' : 'border-[#00AEEF] text-[#00AEEF] hover:bg-[#00AEEF]/10'}`}>
                       {isUploading ? <>Processing File...</> : <><Upload className="w-5 h-5" /> Select Excel File</>}

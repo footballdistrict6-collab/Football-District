@@ -19,7 +19,13 @@ function CatalogContent() {
     if (urlLeague) {
       setSelectedTab(urlLeague);
     } else if (urlCategory) {
-      setSelectedTab(urlCategory);
+      if (urlCategory === 'Long Sleeve') {
+        setSelectedTab('Long Sleeves');
+      } else if (urlCategory === 'Training Suits') {
+        setSelectedTab('Tracksuits');
+      } else {
+        setSelectedTab(urlCategory);
+      }
     } else {
       setSelectedTab('All');
     }
@@ -57,12 +63,18 @@ function CatalogContent() {
           p.category === 'Puffer Jackets' ||
           p.category === 'Full Sets' ||
           p.category === 'Sweatshirts' ||
+          p.category === 'Long Sleeves' ||
           p.category === 'Long Sleeve' ||
+          p.category === 'Tracksuits' ||
           p.category === 'Training Suits' ||
           p.category === 'Windbreakers' ||
+          p.category === 'Windbreaker' ||
           p.title?.toLowerCase().includes('full set') ||
           p.title?.toLowerCase().includes('sweatshirt') ||
           p.title?.toLowerCase().includes('puffer') ||
+          p.title?.toLowerCase().includes('long sleeve') ||
+          p.title?.toLowerCase().includes('tracksuit') ||
+          p.title?.toLowerCase().includes('training suit') ||
           p.title?.toLowerCase().includes('windbreaker');
       } else if (selectedTab === 'Puffer Jackets') {
         matchesTab = p.category === 'Puffer Jackets' || p.title?.toLowerCase().includes('puffer');
@@ -70,6 +82,22 @@ function CatalogContent() {
         matchesTab = p.category === 'Full Sets' || p.title?.toLowerCase().includes('full set');
       } else if (selectedTab === 'Sweatshirts') {
         matchesTab = p.category === 'Sweatshirts' || p.title?.toLowerCase().includes('sweatshirt');
+      } else if (selectedTab === 'Long Sleeves' || selectedTab === 'Long Sleeve') {
+        matchesTab = 
+          p.category === 'Long Sleeves' || 
+          p.category === 'Long Sleeve' || 
+          p.title?.toLowerCase().includes('long sleeve');
+      } else if (selectedTab === 'Tracksuits' || selectedTab === 'Training Suits') {
+        matchesTab = 
+          p.category === 'Tracksuits' || 
+          p.category === 'Training Suits' || 
+          p.title?.toLowerCase().includes('tracksuit') || 
+          p.title?.toLowerCase().includes('training suit');
+      } else if (selectedTab === 'Windbreakers' || selectedTab === 'Windbreaker') {
+        matchesTab = 
+          p.category === 'Windbreakers' || 
+          p.category === 'Windbreaker' || 
+          p.title?.toLowerCase().includes('windbreaker');
       } else if (selectedTab === 'Special Orders' || selectedTab === 'Pre-Order') {
         matchesTab = 
           p.category === 'Special Orders' || 
@@ -95,6 +123,9 @@ function CatalogContent() {
     'Puffer Jackets',
     'Full Sets',
     'Sweatshirts',
+    'Long Sleeves',
+    'Tracksuits',
+    'Windbreakers',
     'Special Orders',
     'Premier League',
     'La Liga',
@@ -127,6 +158,12 @@ function CatalogContent() {
                       ? 'FULL SETS ⚽'
                       : selectedTab === 'Sweatshirts'
                         ? 'SWEATSHIRTS 👕'
+                        : selectedTab === 'Long Sleeves' || selectedTab === 'Long Sleeve'
+                          ? 'LONG SLEEVES 🧤'
+                          : selectedTab === 'Tracksuits' || selectedTab === 'Training Suits'
+                            ? 'TRACKSUITS 🏃'
+                            : selectedTab === 'Windbreakers' || selectedTab === 'Windbreaker'
+                              ? 'WINDBREAKERS 💨'
                         : selectedTab === 'Special Orders'
                           ? 'PRE-ORDER & SPECIAL ORDERS ✈️'
                           : selectedTab === 'Kids' 
@@ -137,13 +174,19 @@ function CatalogContent() {
             {selectedTab === 'Special Orders' || selectedTab === 'Pre-Order'
               ? '✈️ Custom pre-order jerseys and special editions. Estimated delivery time applies.'
               : selectedTab === 'Winter Collection'
-                ? '❄️ Stay warm with our official winter gear, puffer jackets, full tracksuits, and sweatshirts.'
+                ? '❄️ Stay warm with our official winter gear, puffer jackets, tracksuits, sweatshirts, long sleeves, and windbreakers.'
                 : selectedTab === 'Puffer Jackets'
                   ? '🧥 Premium insulated club puffer jackets designed for warmth and street style.'
                   : selectedTab === 'Full Sets'
                     ? '⚽ Official full tracksuits and matching training sets.'
                     : selectedTab === 'Sweatshirts'
                       ? '👕 Comfortable club crewnecks, sweatshirts, and fleece pullovers.'
+                      : selectedTab === 'Long Sleeves' || selectedTab === 'Long Sleeve'
+                        ? '🧤 Official long sleeve jerseys and training tops for colder weather.'
+                        : selectedTab === 'Tracksuits' || selectedTab === 'Training Suits'
+                          ? '🏃 Full zip tracksuits, presentation suits, and authentic training sets.'
+                          : selectedTab === 'Windbreakers' || selectedTab === 'Windbreaker'
+                            ? '💨 Lightweight, wind-resistant and weather-ready club jackets.'
                       : selectedTab === 'Kids'
                         ? '👶 Shop official football kits and gear for the little champions.'
                         : 'Browse our official kits, footwear, and professional gear.'}
@@ -166,6 +209,9 @@ function CatalogContent() {
                 : tab === 'Puffer Jackets' ? '🧥 Puffer Jackets'
                 : tab === 'Full Sets' ? '⚽ Full Sets'
                 : tab === 'Sweatshirts' ? '👕 Sweatshirts'
+                : tab === 'Long Sleeves' ? '🧤 Long Sleeves'
+                : tab === 'Tracksuits' ? '🏃 Tracksuits'
+                : tab === 'Windbreakers' ? '💨 Windbreakers'
                 : tab === 'Special Orders' ? '✈️ Pre-Orders' 
                 : tab === 'Kids' ? '👶 Kids' 
                 : tab}

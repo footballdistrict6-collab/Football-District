@@ -38,14 +38,14 @@ const STORE_CATEGORIES = [
   'Puffer Jackets', 
   'Full Sets', 
   'Sweatshirts', 
+  'Long Sleeves', 
+  'Tracksuits', 
+  'Windbreakers', 
   'Special Orders', 
   'Pre-Order', 
   'Boots', 
   'Equipment', 
-  'Mystery Drop', 
-  'Long Sleeve', 
-  'Training Suits', 
-  'Windbreakers'
+  'Mystery Drop'
 ];
 
 // المصفوفات الثابتة للمقاسات لتوليدها أوتوماتيكياً
@@ -68,6 +68,7 @@ export default function AdminDashboard() {
 
   const [pointValueUsd, setPointValueUsd] = useState<number>(0.05);
   const [editingProduct, setEditingProduct] = useState<any | null>(null);
+  const [adminCategoryFilter, setAdminCategoryFilter] = useState<string>('All');
 
   const [newProduct, setNewProduct] = useState({
     title: '', price: '', category: 'Kits', league: 'Premier League', imageUrl: '', loyalty_points_earned: 20, initial_stock: 10
@@ -190,11 +191,16 @@ export default function AdminDashboard() {
         const parsedProducts = jsonData.map((row: any) => {
           const rowStock = row.Stock !== undefined ? row.Stock : row.Quantity !== undefined ? row.Quantity : row.stock_quantity;
           const parsedStock = rowStock !== undefined && !isNaN(parseInt(rowStock)) ? parseInt(rowStock) : 10;
+          let rawCategory = (row.Category || row.category || 'Kits').toString().trim();
+          if (rawCategory.toLowerCase() === 'long sleeve') rawCategory = 'Long Sleeves';
+          if (rawCategory.toLowerCase() === 'training suits' || rawCategory.toLowerCase() === 'training suit') rawCategory = 'Tracksuits';
+          if (rawCategory.toLowerCase() === 'windbreaker') rawCategory = 'Windbreakers';
+
           return {
             product: {
               title: row.Title || row.title || 'Unnamed', 
               price: parseFloat(row.Price || row.price) || 0,
-              category: row.Category || row.category || 'Kits', 
+              category: rawCategory, 
               league: row.League || row.league || '',
               image_url: row.ImageUrl || row.image_url || 'https://images.unsplash.com/photo-1583318433420-532155e9d9e4',
               image_urls: row.ImageUrl || row.image_url ? [row.ImageUrl || row.image_url] : [],
@@ -532,12 +538,27 @@ export default function AdminDashboard() {
                 </div>
 
                 <div className="bg-[#121212] rounded-2xl border border-[#1f1f1f] overflow-hidden">
-                  <div className="p-6 border-b border-[#222] flex justify-between items-center">
-                    <h3 className="font-bold text-lg">Base Products List ({products.length})</h3>
-                    <button onClick={fetchData} className="text-xs text-[#00AEEF] hover:underline flex items-center gap-1 font-bold"><RefreshCw className="w-3 h-3" /> Refresh List</button>
+                  <div className="p-6 border-b border-[#222] flex flex-col sm:flex-row justify-between sm:items-center gap-4">
+                    <div>
+                      <h3 className="font-bold text-lg">Base Products List ({products.filter(p => adminCategoryFilter === 'All' ? true : p.category === adminCategoryFilter).length})</h3>
+                      <p className="text-xs text-gray-400">Filter and manage products across categories</p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <select 
+                        value={adminCategoryFilter} 
+                        onChange={(e) => setAdminCategoryFilter(e.target.value)} 
+                        className="bg-[#1a1a1a] border border-[#333] rounded-lg px-3 py-1.5 text-xs text-white focus:border-[#00AEEF]"
+                      >
+                        <option value="All">All Categories ({products.length})</option>
+                        {STORE_CATEGORIES.map(cat => (
+                          <option key={cat} value={cat}>{cat} ({products.filter(p => p.category === cat).length})</option>
+                        ))}
+                      </select>
+                      <button onClick={fetchData} className="text-xs text-[#00AEEF] hover:underline flex items-center gap-1 font-bold"><RefreshCw className="w-3 h-3" /> Refresh List</button>
+                    </div>
                   </div>
                   <div className="divide-y divide-[#1f1f1f] max-h-[600px] overflow-y-auto">
-                    {products.map((p) => {
+                    {products.filter(p => adminCategoryFilter === 'All' ? true : p.category === adminCategoryFilter).map((p) => {
                       const img = Array.isArray(p.image_urls) && p.image_urls.length > 0 ? p.image_urls[0] : p.imageUrl || p.image_url;
                       const isAvailable = p.in_stock !== false; 
                       return (
@@ -843,6 +864,9 @@ export default function AdminDashboard() {
                 <div className="grid grid-cols-2 gap-4">
                   <select value={editingProduct.category || 'Kits'} onChange={(e) => setEditingProduct({ ...editingProduct, category: e.target.value })} className="w-full bg-[#1a1a1a] border border-[#333] rounded-lg p-3 text-white text-sm">
                     {STORE_CATEGORIES.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                    {editingProduct.category && !STORE_CATEGORIES.includes(editingProduct.category) && (
+                      <option value={editingProduct.category}>{editingProduct.category}</option>
+                    )}
                   </select>
                   <select value={editingProduct.league || 'Premier League'} onChange={(e) => setEditingProduct({ ...editingProduct, league: e.target.value })} className="w-full bg-[#1a1a1a] border border-[#333] rounded-lg p-3 text-white text-sm">
                     <option value="Premier League">Premier League</option><option value="La Liga">La Liga</option><option value="Serie A">Serie A</option><option value="Bundesliga">Bundesliga</option><option value="Ligue 1">Ligue 1</option><option value="Other / National">Other / National</option>

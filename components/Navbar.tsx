@@ -166,6 +166,24 @@ export default function Navbar() {
                 >
                   <span>👕 Sweatshirts</span>
                 </Link>
+                <Link 
+                  href="/catalog?category=Long+Sleeves" 
+                  className="block px-4 py-2.5 text-xs font-bold text-gray-300 hover:text-white hover:bg-[#1a1a1a] transition flex items-center justify-between"
+                >
+                  <span>🧤 Long Sleeves</span>
+                </Link>
+                <Link 
+                  href="/catalog?category=Tracksuits" 
+                  className="block px-4 py-2.5 text-xs font-bold text-gray-300 hover:text-white hover:bg-[#1a1a1a] transition flex items-center justify-between"
+                >
+                  <span>🏃 Tracksuits</span>
+                </Link>
+                <Link 
+                  href="/catalog?category=Windbreakers" 
+                  className="block px-4 py-2.5 text-xs font-bold text-gray-300 hover:text-white hover:bg-[#1a1a1a] transition flex items-center justify-between"
+                >
+                  <span>💨 Windbreakers</span>
+                </Link>
                 
                 <div className="border-t border-[#222] my-1 pt-1 mt-2">
                   <Link 
@@ -328,6 +346,27 @@ export default function Navbar() {
                         className="block py-2 text-gray-300 hover:text-white font-medium"
                       >
                         <span>👕 Sweatshirts</span>
+                      </Link>
+                      <Link 
+                        href="/catalog?category=Long+Sleeves" 
+                        onClick={() => setMobileMenuOpen(false)} 
+                        className="block py-2 text-gray-300 hover:text-white font-medium"
+                      >
+                        <span>🧤 Long Sleeves</span>
+                      </Link>
+                      <Link 
+                        href="/catalog?category=Tracksuits" 
+                        onClick={() => setMobileMenuOpen(false)} 
+                        className="block py-2 text-gray-300 hover:text-white font-medium"
+                      >
+                        <span>🏃 Tracksuits</span>
+                      </Link>
+                      <Link 
+                        href="/catalog?category=Windbreakers" 
+                        onClick={() => setMobileMenuOpen(false)} 
+                        className="block py-2 text-gray-300 hover:text-white font-medium"
+                      >
+                        <span>💨 Windbreakers</span>
                       </Link>
                       
                       <div className="border-t border-[#222] pt-2 mt-2">

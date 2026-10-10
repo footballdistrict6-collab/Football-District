@@ -113,6 +113,17 @@ export default function CheckoutPage() {
         case 'fixed':
           calculatedDiscount = Math.min(eligibleSubtotal, Number(promo.discount_value));
           break;
+        case 'b1g1_free':
+          if (eligibleItems.length < 2) {
+            setVoucherError('⚠️ This offer requires at least 2 eligible items in your bag.');
+            setIsApplyingVoucher(false);
+            return;
+          }
+          const b1g1Pairs = Math.floor(eligibleItems.length / 2);
+          for (let i = 0; i < b1g1Pairs; i++) {
+            calculatedDiscount += eligibleItems[i].price;
+          }
+          break;
         case 'bogo_50':
           if (eligibleItems.length < 2) {
             setVoucherError('⚠️ This offer requires at least 2 eligible items in your bag.');

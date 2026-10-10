@@ -377,6 +377,7 @@ export default function AdminDashboard() {
     switch (type) {
       case 'percentage': return <span className="text-blue-400 bg-blue-900/30 px-2 py-1 rounded text-xs border border-blue-500/30">{value}% OFF</span>;
       case 'fixed': return <span className="text-green-400 bg-green-900/30 px-2 py-1 rounded text-xs border border-green-500/30">${value} OFF</span>;
+      case 'b1g1_free': return <span className="text-emerald-400 bg-emerald-900/30 px-2 py-1 rounded text-xs border border-emerald-500/30">Buy 1 Get 1 FREE</span>;
       case 'bogo_50': return <span className="text-amber-400 bg-amber-900/30 px-2 py-1 rounded text-xs border border-amber-500/30">Buy 1 Get 1 50%</span>;
       case 'b2g1_free': return <span className="text-purple-400 bg-purple-900/30 px-2 py-1 rounded text-xs border border-purple-500/30">Buy 2 Get 1 FREE</span>;
       default: return <span className="text-gray-400">Discount</span>;
@@ -681,7 +682,11 @@ export default function AdminDashboard() {
                     <div>
                       <label className="block text-sm font-bold text-gray-300 mb-2">Offer Type</label>
                       <select value={newPromo.discount_type} onChange={(e) => setNewPromo({ ...newPromo, discount_type: e.target.value })} className="w-full bg-[#1a1a1a] border border-[#333] rounded-xl p-3.5 text-white focus:border-[#00AEEF]">
-                        <option value="percentage">Discount Percentage (%)</option><option value="fixed">Fixed Amount ($)</option><option value="bogo_50">Buy 1 Get 1 50% OFF</option><option value="b2g1_free">Buy 2 Get 1 FREE</option>
+                        <option value="percentage">Discount Percentage (%)</option>
+                        <option value="fixed">Fixed Amount ($)</option>
+                        <option value="b1g1_free">Buy 1 Get 1 FREE</option>
+                        <option value="bogo_50">Buy 1 Get 1 50% OFF</option>
+                        <option value="b2g1_free">Buy 2 Get 1 FREE</option>
                       </select>
                     </div>
                     {(newPromo.discount_type === 'percentage' || newPromo.discount_type === 'fixed') && (

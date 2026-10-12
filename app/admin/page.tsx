@@ -28,7 +28,9 @@ import {
   Layers,
   Smartphone,
   Box,
-  DollarSign // تم إرجاع أيقونة ميزة الأسعار المجمعة
+  DollarSign, // تم إرجاع أيقونة ميزة الأسعار المجمعة
+  Search, // 🆕 للبحث في العروض
+  Calendar // 🆕 لتواريخ العروض
 } from 'lucide-react';
 
 const STORE_CATEGORIES = [
@@ -77,9 +79,13 @@ export default function AdminDashboard() {
     title: '', price: '', category: 'Kits', league: 'Premier League', imageUrl: '', loyalty_points_earned: 20, initial_stock: 10
   });
 
+  // 🆕 تم تحديث حالة العروض الترويجية (Promos) لتشمل الميزات الاحترافية
   const [newPromo, setNewPromo] = useState({
-    code: '', description: '', discount_type: 'percentage', discount_value: 0, target_categories: [] as string[]
+    code: '', description: '', discount_type: 'percentage', discount_value: 0, target_categories: [] as string[],
+    min_order_amount: 0, max_discount_amount: '', start_date: '', expiration_date: '', usage_limit: '', usage_per_customer: ''
   });
+  const [editingPromo, setEditingPromo] = useState<any | null>(null);
+  const [promoSearchQuery, setPromoSearchQuery] = useState('');
 
   const [popupSettings, setPopupSettings] = useState({
     is_active: false,
@@ -351,6 +357,9 @@ export default function AdminDashboard() {
     await supabase.from('store_settings').upsert([{ id: 1, loyalty_point_value_usd: pointValueUsd }]); alert("✅ تم الحفظ!");
   };
 
+  // -----------------------------------------------------------------------------------
+  // 🔥 دوال الأكواد الترويجية (الاحترافية والمحدثة) 🆕
+  // -----------------------------------------------------------------------------------
   const toggleCategoryForPromo = (category: string) => {
     const isSelected = newPromo.target_categories.includes(category);
     if (isSelected) setNewPromo({ ...newPromo, target_categories: newPromo.target_categories.filter(c => c !== category) });
@@ -361,16 +370,54 @@ export default function AdminDashboard() {
     e.preventDefault();
     if (!newPromo.code) return;
     const finalCategories = newPromo.target_categories.length > 0 ? newPromo.target_categories : STORE_CATEGORIES;
-    const { error } = await supabase.from('promo_codes').insert([{
-      code: newPromo.code.toUpperCase().replace(/\s/g, ''), description: newPromo.description, discount_type: newPromo.discount_type,
-      discount_value: Number(newPromo.discount_value), target_categories: finalCategories
-    }]);
-    if (!error) { alert("✅ تم إنشاء العرض بنجاح!"); setNewPromo({ code: '', description: '', discount_type: 'percentage', discount_value: 0, target_categories: [] }); fetchData(); }
-    else alert("🚨 خطأ: الكود قد يكون موجوداً مسبقاً.");
+
+    const payload = {
+      code: newPromo.code.toUpperCase().replace(/\s/g, ''),
+      description: newPromo.description,
+      discount_type: newPromo.discount_type,
+      discount_value: Number(newPromo.discount_value),
+      target_categories: finalCategories,
+      min_order_amount: Number(newPromo.min_order_amount) || 0,
+      max_discount_amount: newPromo.max_discount_amount ? Number(newPromo.max_discount_amount) : null,
+      start_date: newPromo.start_date ? new Date(newPromo.start_date).toISOString() : null,
+      expiration_date: newPromo.expiration_date ? new Date(newPromo.expiration_date).toISOString() : null,
+      usage_limit: newPromo.usage_limit ? Number(newPromo.usage_limit) : null,
+      usage_per_customer: newPromo.usage_per_customer ? Number(newPromo.usage_per_customer) : null,
+    };
+
+    const { error } = await supabase.from('promo_codes').insert([payload]);
+    if (!error) {
+      alert("✅ Promo Code successfully created!");
+      setNewPromo({ code: '', description: '', discount_type: 'percentage', discount_value: 0, target_categories: [], min_order_amount: 0, max_discount_amount: '', start_date: '', expiration_date: '', usage_limit: '', usage_per_customer: '' });
+      fetchData();
+    }
+    else alert("🚨 Error: This code might already exist or you didn't run the SQL update.");
+  };
+
+  // 🆕 دالة جديدة لحفظ تعديلات كود موجود
+  const handleSaveEditPromo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingPromo) return;
+    const payload = {
+      code: editingPromo.code.toUpperCase().replace(/\s/g, ''),
+      description: editingPromo.description,
+      discount_type: editingPromo.discount_type,
+      discount_value: Number(editingPromo.discount_value),
+      min_order_amount: Number(editingPromo.min_order_amount) || 0,
+      max_discount_amount: editingPromo.max_discount_amount ? Number(editingPromo.max_discount_amount) : null,
+      start_date: editingPromo.start_date ? new Date(editingPromo.start_date).toISOString() : null,
+      expiration_date: editingPromo.expiration_date ? new Date(editingPromo.expiration_date).toISOString() : null,
+      usage_limit: editingPromo.usage_limit ? Number(editingPromo.usage_limit) : null,
+    };
+
+    const { error } = await supabase.from('promo_codes').update(payload).eq('id', editingPromo.id);
+    if (!error) { alert("✅ Promo updated successfully!"); setEditingPromo(null); fetchData(); }
+    else alert("🚨 Error updating promo.");
   };
 
   const togglePromoStatus = async (id: number, currentStatus: boolean) => { await supabase.from('promo_codes').update({ is_active: !currentStatus }).eq('id', id); fetchData(); };
-  const handleDeletePromo = async (id: number) => { if (!confirm("❓ متأكد من حذف العرض؟")) return; await supabase.from('promo_codes').delete().eq('id', id); fetchData(); };
+  const handleDeletePromo = async (id: number) => { if (!confirm("❓ Delete this promotion?")) return; await supabase.from('promo_codes').delete().eq('id', id); fetchData(); };
+
   const getPromoTypeBadge = (type: string, value: number) => {
     switch (type) {
       case 'percentage': return <span className="text-blue-400 bg-blue-900/30 px-2 py-1 rounded text-xs border border-blue-500/30">{value}% OFF</span>;
@@ -381,6 +428,11 @@ export default function AdminDashboard() {
       default: return <span className="text-gray-400">Discount</span>;
     }
   };
+
+  // 🆕 فلترة العروض باستخدام شريط البحث
+  const filteredPromos = promos.filter(p => p.code.toLowerCase().includes(promoSearchQuery.toLowerCase()) || p.description?.toLowerCase().includes(promoSearchQuery.toLowerCase()));
+
+  // -----------------------------------------------------------------------------------
 
   const handleAddPopupPromo = () => {
     setPopupSettings({
@@ -408,7 +460,7 @@ export default function AdminDashboard() {
   };
 
   // -----------------------------------------------------------------------------------
-  // 🔥 دوال التسعير المجمّع التي كانت مفقودة (Bulk Price Editor Logic)
+  // 🔥 دوال التسعير المجمّع (Bulk Price Editor Logic)
   // -----------------------------------------------------------------------------------
   const handlePreviewBulkPrice = () => {
     if (!bulkCategory) return alert("⚠️ Please select a product category first.");
@@ -488,7 +540,6 @@ export default function AdminDashboard() {
             <button onClick={() => setActiveTab('inventory')} className={`px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition ${activeTab === 'inventory' ? 'bg-[#00AEEF] text-white' : 'text-gray-400 hover:text-white'}`}><Layers className="w-4 h-4" /> Inventory</button>
             <button onClick={() => setActiveTab('products')} className={`px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition ${activeTab === 'products' ? 'bg-[#00AEEF] text-white' : 'text-gray-400 hover:text-white'}`}><Package className="w-4 h-4" /> Products</button>
 
-            {/* التبويب الخاص بميزة الأسعار المجمعة Bulk Pricing */}
             <button onClick={() => setActiveTab('bulk_price')} className={`px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition ${activeTab === 'bulk_price' ? 'bg-green-600 text-white' : 'text-gray-400 hover:text-green-400 border border-transparent hover:border-green-600/30'}`}><DollarSign className="w-4 h-4" /> Bulk Pricing</button>
 
             <button onClick={() => setActiveTab('orders')} className={`px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition ${activeTab === 'orders' ? 'bg-[#00AEEF] text-white' : 'text-gray-400 hover:text-white'}`}><ShoppingBag className="w-4 h-4" /> Orders</button>
@@ -661,7 +712,7 @@ export default function AdminDashboard() {
               </div>
             )}
 
-            {/* 🆕 4. التبويب الخاص بميزة Bulk Pricing (تعديل الأسعار المجمّع) 🆕 */}
+            {/* 4. התبويب الخاص بميزة Bulk Pricing (تعديل الأسعار المجمّع) */}
             {activeTab === 'bulk_price' && (
               <div className="space-y-8 animate-fadeIn">
                 <div className="bg-[#121212] p-6 md:p-8 rounded-2xl border border-[#1f1f1f] shadow-xl">
@@ -682,7 +733,7 @@ export default function AdminDashboard() {
                         <div>
                           <label className="block text-sm font-bold text-gray-300 mb-2">2. Adjustment Type</label>
                           <select value={bulkAdjType} onChange={(e) => setBulkAdjType(e.target.value)} className="w-full bg-[#1a1a1a] border border-[#333] rounded-xl p-3.5 text-white focus:border-[#00AEEF]">
-                            <option value="fixed_price">Set Fixed Price (\$)</option>
+                            <option value="fixed_price">Set Fixed Price ($)</option>
                             <option value="increase_percent">Increase by Percentage (+%)</option>
                             <option value="decrease_percent">Decrease by Percentage (-%)</option>
                             <option value="fixed_amount">Increase/Decrease Amount (+/- $)</option>
@@ -799,16 +850,16 @@ export default function AdminDashboard() {
                                 return (
                                   <div key={idx} className="flex justify-between text-xs text-gray-300">
                                     <span>{item.quantity}x {v?.products?.title || 'Item'} (Size: {v?.size || '?'})</span>
-                                    <span className="font-bold text-white">\${item.unit_price}</span>
+                                    <span className="font-bold text-white">${item.unit_price}</span>
                                   </div>
                                 )
                               })
                             ) : (
                               Array.isArray(order.items) && order.items.map((item: any, idx: number) => (
-                                <div key={idx} className="flex justify-between text-xs text-gray-300"><span>{item.quantity}x {item.title}</span><span className="font-bold text-white">\${item.price}</span></div>
+                                <div key={idx} className="flex justify-between text-xs text-gray-300"><span>{item.quantity}x {item.title}</span><span className="font-bold text-white">${item.price}</span></div>
                               ))
                             )}
-                            <div className="border-t border-[#2d2d2d] pt-2 mt-2 flex justify-between items-center text-sm font-extrabold text-white"><span>Total (COD):</span><span className="text-[#00AEEF]">\${order.total_amount}</span></div>
+                            <div className="border-t border-[#2d2d2d] pt-2 mt-2 flex justify-between items-center text-sm font-extrabold text-white"><span>Total (COD):</span><span className="text-[#00AEEF]">${order.total_amount}</span></div>
                           </div>
                         </div>
                       );
@@ -818,35 +869,65 @@ export default function AdminDashboard() {
               </div>
             )}
 
-            {/* 6. تبويب الأكواد الذكية (Promos) */}
+            {/* 🆕 6. تبويب الأكواد الذكية (Promos) المحدث والمطور 🆕 */}
             {activeTab === 'promos' && (
               <div className="space-y-8 animate-fadeIn">
-                <form onSubmit={handleAddPromoCode} className="bg-[#121212] p-8 rounded-2xl border border-[#1f1f1f] shadow-xl max-w-4xl space-y-6">
-                  <h3 className="font-bold text-xl border-b border-[#222] pb-4 flex items-center gap-2"><Tag className="w-6 h-6 text-[#00AEEF]" /> Create Advanced Smart Offer</h3>
+                <form onSubmit={handleAddPromoCode} className="bg-[#121212] p-8 rounded-2xl border border-[#1f1f1f] shadow-xl max-w-5xl mx-auto space-y-6">
+                  <h3 className="font-bold text-xl border-b border-[#222] pb-4 flex items-center gap-2">
+                    <Tag className="w-6 h-6 text-[#00AEEF]" /> Advanced Promo Code Builder
+                  </h3>
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div><label className="block text-sm font-bold text-gray-300 mb-2">Promo Code</label><input type="text" required value={newPromo.code} onChange={(e) => setNewPromo({ ...newPromo, code: e.target.value.toUpperCase() })} className="w-full bg-[#1a1a1a] border border-[#333] rounded-xl p-3.5 text-white focus:border-[#00AEEF] tracking-widest font-mono" /></div>
-                    <div><label className="block text-sm font-bold text-gray-300 mb-2">Description</label><input type="text" value={newPromo.description} onChange={(e) => setNewPromo({ ...newPromo, description: e.target.value })} className="w-full bg-[#1a1a1a] border border-[#333] rounded-xl p-3.5 text-white focus:border-[#00AEEF]" /></div>
+                    <div><label className="block text-sm font-bold text-gray-300 mb-2">Promo Code (e.g. PAY2, SAVE10)</label><input type="text" required value={newPromo.code} onChange={(e) => setNewPromo({ ...newPromo, code: e.target.value.toUpperCase() })} className="w-full bg-[#1a1a1a] border border-[#333] rounded-xl p-3 text-white focus:border-[#00AEEF] tracking-widest font-mono" /></div>
+                    <div><label className="block text-sm font-bold text-gray-300 mb-2">Internal Description (Optional)</label><input type="text" value={newPromo.description} onChange={(e) => setNewPromo({ ...newPromo, description: e.target.value })} className="w-full bg-[#1a1a1a] border border-[#333] rounded-xl p-3 text-white focus:border-[#00AEEF]" /></div>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-5 bg-[#161616] rounded-xl border border-[#2b2b2b]">
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-5 bg-[#161616] rounded-xl border border-[#2b2b2b]">
                     <div>
                       <label className="block text-sm font-bold text-gray-300 mb-2">Offer Type</label>
-                      <select value={newPromo.discount_type} onChange={(e) => setNewPromo({ ...newPromo, discount_type: e.target.value })} className="w-full bg-[#1a1a1a] border border-[#333] rounded-xl p-3.5 text-white focus:border-[#00AEEF]">
+                      <select value={newPromo.discount_type} onChange={(e) => setNewPromo({ ...newPromo, discount_type: e.target.value })} className="w-full bg-[#1a1a1a] border border-[#333] rounded-xl p-3 text-white text-sm focus:border-[#00AEEF]">
                         <option value="percentage">Discount Percentage (%)</option>
-                        <option value="fixed">Fixed Amount (\$)</option>
+                        <option value="fixed">Fixed Amount ($)</option>
                         <option value="b1g1_free">Buy 1 Get 1 FREE</option>
                         <option value="bogo_50">Buy 1 Get 1 50% OFF</option>
                         <option value="b2g1_free">Buy 2 Get 1 FREE</option>
                       </select>
                     </div>
                     {(newPromo.discount_type === 'percentage' || newPromo.discount_type === 'fixed') && (
-                      <div className="animate-in fade-in zoom-in">
+                      <div>
                         <label className="block text-sm font-bold text-gray-300 mb-2 flex items-center gap-1"><Percent className="w-4 h-4 text-amber-400" /> Value</label>
-                        <input type="number" required value={newPromo.discount_value} onChange={(e) => setNewPromo({ ...newPromo, discount_value: Number(e.target.value) })} className="w-full bg-[#1a1a1a] border border-[#333] rounded-xl p-3.5 text-white focus:border-[#00AEEF]" />
+                        <input type="number" required value={newPromo.discount_value} onChange={(e) => setNewPromo({ ...newPromo, discount_value: Number(e.target.value) })} className="w-full bg-[#1a1a1a] border border-[#333] rounded-xl p-3 text-white focus:border-[#00AEEF]" />
+                      </div>
+                    )}
+                    {newPromo.discount_type === 'percentage' && (
+                      <div>
+                        <label className="block text-sm font-bold text-gray-300 mb-2">Max Discount Amount ($)</label>
+                        <input type="number" min="0" value={newPromo.max_discount_amount} onChange={(e) => setNewPromo({ ...newPromo, max_discount_amount: e.target.value })} placeholder="Optional limit" className="w-full bg-[#1a1a1a] border border-[#333] rounded-xl p-3 text-white focus:border-[#00AEEF]" />
                       </div>
                     )}
                   </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-5 bg-[#161616] rounded-xl border border-[#2b2b2b]">
+                    <div>
+                      <label className="block text-sm font-bold text-gray-300 mb-2">Min Order Amount ($)</label>
+                      <input type="number" min="0" value={newPromo.min_order_amount} onChange={(e) => setNewPromo({ ...newPromo, min_order_amount: Number(e.target.value) })} placeholder="0" className="w-full bg-[#1a1a1a] border border-[#333] rounded-xl p-3 text-white text-sm focus:border-[#00AEEF]" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-gray-300 mb-2">Total Usage Limit</label>
+                      <input type="number" min="1" value={newPromo.usage_limit} onChange={(e) => setNewPromo({ ...newPromo, usage_limit: e.target.value })} placeholder="Unlimited if empty" className="w-full bg-[#1a1a1a] border border-[#333] rounded-xl p-3 text-white text-sm focus:border-[#00AEEF]" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-gray-300 mb-2">Start Date</label>
+                      <input type="datetime-local" value={newPromo.start_date} onChange={(e) => setNewPromo({ ...newPromo, start_date: e.target.value })} className="w-full bg-[#1a1a1a] border border-[#333] rounded-xl p-3 text-white text-xs focus:border-[#00AEEF] [color-scheme:dark]" />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-bold text-gray-300 mb-2">Expiration Date</label>
+                      <input type="datetime-local" value={newPromo.expiration_date} onChange={(e) => setNewPromo({ ...newPromo, expiration_date: e.target.value })} className="w-full bg-[#1a1a1a] border border-[#333] rounded-xl p-3 text-white text-xs focus:border-[#00AEEF] [color-scheme:dark]" />
+                    </div>
+                  </div>
+
                   <div className="p-5 bg-[#161616] rounded-xl border border-[#2b2b2b]">
-                    <label className="block text-sm font-bold text-gray-300 mb-3">Target Categories</label>
+                    <label className="block text-sm font-bold text-gray-300 mb-3">Target Categories (Leave empty for entire store)</label>
                     <div className="flex flex-wrap gap-3">
                       {STORE_CATEGORIES.map(cat => (
                         <label key={cat} className={`cursor-pointer px-4 py-2 rounded-lg text-sm font-bold border transition flex items-center gap-2 ${newPromo.target_categories.includes(cat) ? 'bg-[#00AEEF]/20 border-[#00AEEF] text-[#00AEEF]' : 'bg-[#1a1a1a] border-[#333] text-gray-400 hover:border-gray-500'}`}>
@@ -856,28 +937,49 @@ export default function AdminDashboard() {
                       ))}
                     </div>
                   </div>
-                  <button type="submit" className="w-full bg-[#00AEEF] hover:bg-blue-500 text-white font-extrabold py-4 rounded-xl transition shadow-lg text-lg">+ Launch Promo Campaign</button>
+                  <button type="submit" className="w-full bg-[#00AEEF] hover:bg-blue-500 text-white font-extrabold py-4 rounded-xl transition shadow-lg text-lg">+ Launch Custom Promo</button>
                 </form>
 
                 <div className="bg-[#121212] rounded-2xl border border-[#1f1f1f] overflow-hidden">
-                  <div className="p-6 border-b border-[#222] flex justify-between items-center"><h3 className="font-bold text-lg">Active Campaigns ({promos.length})</h3></div>
+                  <div className="p-6 border-b border-[#222] flex flex-col md:flex-row justify-between items-center gap-4">
+                    <h3 className="font-bold text-lg">Active & Past Campaigns ({promos.length})</h3>
+                    <div className="relative w-full md:w-64">
+                      <input type="text" placeholder="Search codes..." value={promoSearchQuery} onChange={(e) => setPromoSearchQuery(e.target.value)} className="w-full bg-[#1a1a1a] border border-[#333] rounded-xl py-2 pl-9 pr-4 text-sm text-white focus:border-[#00AEEF] outline-none" />
+                      <Search className="w-4 h-4 text-gray-500 absolute left-3 top-2.5" />
+                    </div>
+                  </div>
                   <div className="divide-y divide-[#1f1f1f]">
-                    {promos.length === 0 ? <div className="p-12 text-center text-gray-500">No campaigns.</div> : promos.map((promo) => (
-                      <div key={promo.id} className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-[#161616] transition">
-                        <div>
-                          <div className="flex items-center gap-3 mb-2"><span className="font-mono text-xl font-black text-[#00AEEF] tracking-widest">{promo.code}</span>{getPromoTypeBadge(promo.discount_type, promo.discount_value)}</div>
-                          <p className="text-sm text-gray-400">{promo.description}</p>
-                          <div className="mt-3 flex flex-wrap gap-1.5">
-                            {promo.target_categories && promo.target_categories.length > 0 ? promo.target_categories.map((c: string) => <span key={c} className="text-[10px] bg-[#1a1a1a] border border-[#333] px-2 py-1 rounded text-gray-400">{c}</span>) : <span className="text-[10px] bg-green-900/20 border border-green-500/30 px-2 py-1 rounded text-green-400">All Categories</span>}
+                    {filteredPromos.length === 0 ? <div className="p-12 text-center text-gray-500">No campaigns found.</div> : filteredPromos.map((promo) => {
+                      const isExpired = promo.expiration_date && new Date(promo.expiration_date) < new Date();
+                      const isLimitReached = promo.usage_limit && promo.usage_count >= promo.usage_limit;
+                      return (
+                        <div key={promo.id} className={`p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 transition ${isExpired || isLimitReached ? 'opacity-60 bg-[#161616]' : 'hover:bg-[#161616]'}`}>
+                          <div>
+                            <div className="flex items-center gap-3 mb-2">
+                              <span className="font-mono text-xl font-black text-[#00AEEF] tracking-widest">{promo.code}</span>
+                              {getPromoTypeBadge(promo.discount_type, promo.discount_value)}
+                              {isExpired && <span className="text-[10px] bg-red-900/30 text-red-400 px-2 py-0.5 rounded border border-red-500/30">Expired</span>}
+                              {isLimitReached && <span className="text-[10px] bg-amber-900/30 text-amber-400 px-2 py-0.5 rounded border border-amber-500/30">Limit Reached</span>}
+                            </div>
+                            <p className="text-sm text-gray-400 mb-2">{promo.description || 'No description'}</p>
+                            <div className="flex flex-wrap gap-x-4 gap-y-2 text-xs text-gray-500 font-medium">
+                              <span className="flex items-center gap-1"><ShoppingBag className="w-3.5 h-3.5" /> Min Order: ${promo.min_order_amount || 0}</span>
+                              <span className="flex items-center gap-1 text-purple-400"><RefreshCw className="w-3.5 h-3.5" /> Used: {promo.usage_count || 0} {promo.usage_limit ? `/ ${promo.usage_limit}` : 'times'}</span>
+                              {promo.expiration_date && <span className="flex items-center gap-1"><Calendar className="w-3.5 h-3.5" /> Expires: {new Date(promo.expiration_date).toLocaleDateString()}</span>}
+                            </div>
+                            <div className="mt-3 flex flex-wrap gap-1.5">
+                              {promo.target_categories && promo.target_categories.length > 0 ? promo.target_categories.map((c: string) => <span key={c} className="text-[10px] bg-[#1a1a1a] border border-[#333] px-2 py-1 rounded text-gray-400">{c}</span>) : <span className="text-[10px] bg-green-900/20 border border-green-500/30 px-2 py-1 rounded text-green-400">Entire Store</span>}
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <span className={`text-[10px] font-extrabold uppercase px-3 py-1.5 rounded-full border ${promo.is_active ? 'bg-green-950/40 text-green-400 border-green-500/30' : 'bg-red-950/40 text-red-400 border-red-500/30'}`}>{promo.is_active ? 'Active' : 'Disabled'}</span>
+                            <button onClick={() => togglePromoStatus(promo.id, promo.is_active)} className={`p-2.5 rounded-xl transition ${promo.is_active ? 'bg-[#1a1a1a] hover:bg-yellow-600 text-gray-300 border border-[#333]' : 'bg-[#1a1a1a] hover:bg-green-600 text-gray-300 border border-[#333]'}`} title="Toggle Status">{promo.is_active ? <PowerOff className="w-4 h-4" /> : <Power className="w-4 h-4" />}</button>
+                            <button onClick={() => setEditingPromo(promo)} className="p-2.5 bg-[#1a1a1a] border border-[#333] hover:bg-[#00AEEF] hover:text-white text-gray-300 rounded-xl transition" title="Edit Offer"><Edit3 className="w-4 h-4" /></button>
+                            <button onClick={() => handleDeletePromo(promo.id)} className="p-2.5 bg-[#1a1a1a] border border-[#333] hover:bg-red-600 hover:text-white text-gray-300 rounded-xl transition" title="Delete"><Trash2 className="w-4 h-4" /></button>
                           </div>
                         </div>
-                        <div className="flex items-center gap-3">
-                          <span className={`text-[10px] font-extrabold uppercase px-3 py-1.5 rounded-full border ${promo.is_active ? 'bg-green-950/40 text-green-400 border-green-500/30' : 'bg-red-950/40 text-red-400 border-red-500/30'}`}>{promo.is_active ? 'Active' : 'Disabled'}</span>
-                          <button onClick={() => togglePromoStatus(promo.id, promo.is_active)} className={`p-2.5 rounded-xl transition ${promo.is_active ? 'bg-[#1a1a1a] hover:bg-yellow-600 text-gray-300 border border-[#333]' : 'bg-[#1a1a1a] hover:bg-green-600 text-gray-300 border border-[#333]'}`}>{promo.is_active ? <PowerOff className="w-5 h-5" /> : <Power className="w-5 h-5" />}</button>
-                          <button onClick={() => handleDeletePromo(promo.id)} className="p-2.5 bg-[#1a1a1a] border border-[#333] hover:bg-red-600 rounded-xl"><Trash2 className="w-5 h-5" /></button>
-                        </div>
-                      </div>
-                    ))}
+                      )
+                    })}
                   </div>
                 </div>
               </div>
@@ -1003,7 +1105,45 @@ export default function AdminDashboard() {
           </>
         )}
 
-        {/* --- نوافذ منبثقة للوحة التحكم --- */}
+        {/* --- 🆕 نافذة تعديل الأكواد الترويجية (Edit Promo Modal) 🆕 --- */}
+        {editingPromo && (
+          <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-[60] p-4">
+            <div className="bg-[#121212] border border-[#222] rounded-2xl p-6 max-w-2xl w-full space-y-4 relative shadow-2xl overflow-y-auto max-h-[90vh]">
+              <button onClick={() => setEditingPromo(null)} className="absolute top-4 right-4 text-gray-400 hover:text-white"><X className="w-5 h-5" /></button>
+              <h3 className="font-extrabold text-xl border-b border-[#222] pb-3 flex items-center gap-2"><Edit3 className="w-5 h-5 text-[#00AEEF]" /> Edit Promo: {editingPromo.code}</h3>
+              <form onSubmit={handleSaveEditPromo} className="space-y-4 pt-2">
+                <div className="grid grid-cols-2 gap-4">
+                  <div><label className="block text-xs text-gray-400 mb-1">Code</label><input type="text" value={editingPromo.code} onChange={(e) => setEditingPromo({ ...editingPromo, code: e.target.value.toUpperCase() })} className="w-full bg-[#1a1a1a] border border-[#333] rounded-lg p-3 text-white text-sm focus:border-[#00AEEF] font-mono" /></div>
+                  <div><label className="block text-xs text-gray-400 mb-1">Description</label><input type="text" value={editingPromo.description || ''} onChange={(e) => setEditingPromo({ ...editingPromo, description: e.target.value })} className="w-full bg-[#1a1a1a] border border-[#333] rounded-lg p-3 text-white text-sm focus:border-[#00AEEF]" /></div>
+                </div>
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label className="block text-xs text-gray-400 mb-1">Offer Type</label>
+                    <select value={editingPromo.discount_type} onChange={(e) => setEditingPromo({ ...editingPromo, discount_type: e.target.value })} className="w-full bg-[#1a1a1a] border border-[#333] rounded-lg p-3 text-white text-sm focus:border-[#00AEEF]">
+                      <option value="percentage">Percentage (%)</option><option value="fixed">Fixed (\$)</option><option value="b1g1_free">Buy 1 Get 1 FREE</option><option value="bogo_50">Buy 1 Get 1 50%</option><option value="b2g1_free">Buy 2 Get 1 FREE</option>
+                    </select>
+                  </div>
+                  <div><label className="block text-xs text-gray-400 mb-1">Value</label><input type="number" value={editingPromo.discount_value} onChange={(e) => setEditingPromo({ ...editingPromo, discount_value: e.target.value })} className="w-full bg-[#1a1a1a] border border-[#333] rounded-lg p-3 text-white text-sm focus:border-[#00AEEF]" /></div>
+                  <div><label className="block text-xs text-gray-400 mb-1">Max Discount (\$)</label><input type="number" min="0" value={editingPromo.max_discount_amount || ''} onChange={(e) => setEditingPromo({ ...editingPromo, max_discount_amount: e.target.value })} className="w-full bg-[#1a1a1a] border border-[#333] rounded-lg p-3 text-white text-sm focus:border-[#00AEEF]" /></div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div><label className="block text-xs text-gray-400 mb-1">Min Order Amount (\$)</label><input type="number" min="0" value={editingPromo.min_order_amount || 0} onChange={(e) => setEditingPromo({ ...editingPromo, min_order_amount: e.target.value })} className="w-full bg-[#1a1a1a] border border-[#333] rounded-lg p-3 text-white text-sm focus:border-[#00AEEF]" /></div>
+                  <div><label className="block text-xs text-gray-400 mb-1">Usage Limit</label><input type="number" min="1" value={editingPromo.usage_limit || ''} onChange={(e) => setEditingPromo({ ...editingPromo, usage_limit: e.target.value })} className="w-full bg-[#1a1a1a] border border-[#333] rounded-lg p-3 text-white text-sm focus:border-[#00AEEF]" /></div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div><label className="block text-xs text-gray-400 mb-1">Start Date</label><input type="datetime-local" value={editingPromo.start_date ? new Date(editingPromo.start_date).toISOString().slice(0, 16) : ''} onChange={(e) => setEditingPromo({ ...editingPromo, start_date: e.target.value })} className="w-full bg-[#1a1a1a] border border-[#333] rounded-lg p-3 text-white text-xs focus:border-[#00AEEF] [color-scheme:dark]" /></div>
+                  <div><label className="block text-xs text-gray-400 mb-1">Expiration Date</label><input type="datetime-local" value={editingPromo.expiration_date ? new Date(editingPromo.expiration_date).toISOString().slice(0, 16) : ''} onChange={(e) => setEditingPromo({ ...editingPromo, expiration_date: e.target.value })} className="w-full bg-[#1a1a1a] border border-[#333] rounded-lg p-3 text-white text-xs focus:border-[#00AEEF] [color-scheme:dark]" /></div>
+                </div>
+                <div className="flex gap-3 pt-4 border-t border-[#222]">
+                  <button type="button" onClick={() => setEditingPromo(null)} className="flex-1 bg-[#1a1a1a] text-gray-300 py-3 rounded-xl border border-[#333]">Cancel</button>
+                  <button type="submit" className="flex-1 bg-[#00AEEF] text-white py-3 rounded-xl font-extrabold">Save Promo Code</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* --- نوافذ منبثقة للمنتجات --- */}
         {editingProduct && (
           <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
             <div className="bg-[#121212] border border-[#222] rounded-2xl p-6 max-w-lg w-full space-y-4 relative shadow-2xl">

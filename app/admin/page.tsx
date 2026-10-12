@@ -3,17 +3,17 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { supabase } from '@/lib/supabase';
 import * as XLSX from 'xlsx';
-import { 
-  Package, 
-  ShoppingBag, 
-  Award, 
-  Plus, 
-  Edit3, 
-  Trash2, 
-  CheckCircle2, 
-  Clock, 
-  RefreshCw, 
-  Upload, 
+import {
+  Package,
+  ShoppingBag,
+  Award,
+  Plus,
+  Edit3,
+  Trash2,
+  CheckCircle2,
+  Clock,
+  RefreshCw,
+  Upload,
   X,
   Tag,
   Power,
@@ -27,24 +27,25 @@ import {
   BarChart,
   Layers,
   Smartphone,
-  Box
+  Box,
+  DollarSign // تم إرجاع أيقونة ميزة الأسعار المجمعة
 } from 'lucide-react';
 
 const STORE_CATEGORIES = [
-  'Kits', 
-  'Retro Kits', 
-  'Kids', 
-  'Winter Collection', 
-  'Puffer Jackets', 
-  'Full Sets', 
-  'Sweatshirts', 
-  'Long Sleeves', 
-  'Tracksuits', 
-  'Windbreakers', 
-  'Special Orders', 
-  'Pre-Order', 
-  'Boots', 
-  'Equipment', 
+  'Kits',
+  'Retro Kits',
+  'Kids',
+  'Winter Collection',
+  'Puffer Jackets',
+  'Full Sets',
+  'Sweatshirts',
+  'Long Sleeves',
+  'Tracksuits',
+  'Windbreakers',
+  'Special Orders',
+  'Pre-Order',
+  'Boots',
+  'Equipment',
   'Mystery Drop'
 ];
 
@@ -54,8 +55,8 @@ const BOOT_SIZES = ['38', '39', '40', '41', '42', '43', '44', '45'];
 const KIDS_SIZES = ['2-4', '4-5', '5-6', '7-8', '9', '10-11', '12-13'];
 
 export default function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState<'overview' | 'products' | 'inventory' | 'orders' | 'loyalty' | 'promos' | 'popup'>('overview');
-  
+  const [activeTab, setActiveTab] = useState<'overview' | 'products' | 'inventory' | 'orders' | 'loyalty' | 'promos' | 'popup' | 'bulk_price'>('overview');
+
   // States
   const [products, setProducts] = useState<any[]>([]);
   const [variants, setVariants] = useState<any[]>([]);
@@ -68,6 +69,8 @@ export default function AdminDashboard() {
 
   const [pointValueUsd, setPointValueUsd] = useState<number>(0.05);
   const [editingProduct, setEditingProduct] = useState<any | null>(null);
+
+  // إضافتك الرائعة للفلترة
   const [adminCategoryFilter, setAdminCategoryFilter] = useState<string>('All');
 
   const [newProduct, setNewProduct] = useState({
@@ -79,13 +82,13 @@ export default function AdminDashboard() {
   });
 
   const [popupSettings, setPopupSettings] = useState({
-    is_active: false, 
-    title: 'UNLOCK SPECIAL DEALS!', 
-    description: 'Claim your exclusive offers before they expire.', 
-    button_text: 'Start Shopping Now', 
-    button_link: '/catalog', 
+    is_active: false,
+    title: 'UNLOCK SPECIAL DEALS!',
+    description: 'Claim your exclusive offers before they expire.',
+    button_text: 'Start Shopping Now',
+    button_link: '/catalog',
     delay_seconds: 3,
-    show_frequency: 'once_per_session', 
+    show_frequency: 'once_per_session',
     footer_text: 'Enter the promo code at checkout. Only one code per order.',
     promos: [] as { title: string, subtitle: string, code: string }[]
   });
@@ -95,9 +98,20 @@ export default function AdminDashboard() {
   const [waOrder, setWaOrder] = useState({ first_name: '', last_name: '', phone: '', address: '', variant_id: '', qty: 1 });
   const [stockAdjustment, setStockAdjustment] = useState<{ [key: string]: number }>({});
 
+  // ----------------------------------------------------
+  // 🔥 حالات ميزة تعديل الأسعار المجمّع (Bulk Price Editor)
+  // ----------------------------------------------------
+  const [bulkCategory, setBulkCategory] = useState('');
+  const [bulkAdjType, setBulkAdjType] = useState('fixed_price');
+  const [bulkAdjValue, setBulkAdjValue] = useState<number | ''>('');
+  const [previewMode, setPreviewMode] = useState(false);
+  const [previewProducts, setPreviewProducts] = useState<any[]>([]);
+  const [isApplyingBulk, setIsApplyingBulk] = useState(false);
+  const dynamicCategories = Array.from(new Set([...STORE_CATEGORIES, ...products.map(p => p.category).filter(Boolean)]));
+
   const fetchData = async () => {
     setLoading(true);
-    
+
     const { data: productsData } = await supabase.from('products').select('*').order('id', { ascending: false });
     if (productsData) setProducts(productsData);
 
@@ -127,17 +141,15 @@ export default function AdminDashboard() {
 
   useEffect(() => { fetchData(); }, []);
 
-  // --- إحصائيات لوحة التحكم (ERP Overview) ---
   const totalRevenue = orders.filter(o => o.order_status === 'Delivered' || o.status === 'Delivered').reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
   const websiteOrdersCount = orders.filter(o => o.source === 'Website' || !o.source).length;
   const whatsappOrdersCount = orders.filter(o => o.source === 'WhatsApp').length;
 
-  // --- الدالة المحدثة: إضافة منتج فردي + توليد مقاساته أوتوماتيكياً بحالة In Stock ---
+  // --- إضافة منتج فردي + توليد مقاساته ---
   const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newProduct.title || !newProduct.price) return alert("⚠️ يرجى إدخال عنوان المنتج وسعره!");
-    
-    // 1. إدخال المنتج الأساسي واسترجاع الـ ID الخاص به
+
     const { data: insertedProduct, error } = await supabase.from('products').insert([{
       title: newProduct.title, price: parseFloat(newProduct.price), category: newProduct.category, league: newProduct.league,
       image_url: newProduct.imageUrl || 'https://images.unsplash.com/photo-1583318433420-532155e9d9e4?q=80&w=500',
@@ -145,13 +157,9 @@ export default function AdminDashboard() {
       in_stock: true
     }]).select().single();
 
-    if (error) {
-      alert("🚨 خطأ أثناء الإضافة: " + error.message);
-      return;
-    }
+    if (error) { alert("🚨 خطأ أثناء الإضافة: " + error.message); return; }
 
     if (insertedProduct) {
-      // 2. توليد المقاسات بناءً على الفئة
       const categoryLower = newProduct.category.toLowerCase();
       let sizesToCreate = KIT_SIZES;
       if (categoryLower.includes('boot') || newProduct.category === 'Boots') sizesToCreate = BOOT_SIZES;
@@ -162,20 +170,19 @@ export default function AdminDashboard() {
       const variantsToInsert = sizesToCreate.map(size => ({
         product_id: insertedProduct.id,
         size: size,
-        stock_quantity: defaultStockQty, // الرصيد المبدئي In Stock تلقائياً
+        stock_quantity: defaultStockQty,
         low_stock_threshold: 2
       }));
 
-      // 3. إدخال المقاسات في جدول المخزون
       await supabase.from('product_variants').insert(variantsToInsert);
 
-      alert("✅ تم إضافة المنتج وتوليد مقاساته في قسم المخزون بحالة In Stock بنجاح!"); 
-      setNewProduct({ title: '', price: '', category: 'Kits', league: 'Premier League', imageUrl: '', loyalty_points_earned: 20, initial_stock: 10 }); 
+      alert("✅ تم إضافة المنتج وتوليد مقاساته في قسم المخزون بحالة In Stock بنجاح!");
+      setNewProduct({ title: '', price: '', category: 'Kits', league: 'Premier League', imageUrl: '', loyalty_points_earned: 20, initial_stock: 10 });
       fetchData();
     }
   };
 
-  // --- الدالة المحدثة: رفع المنتجات عبر إكسل + توليد مقاساتها أوتوماتيكياً بحالة In Stock ---
+  // --- رفع المنتجات عبر إكسل + توليد مقاساتها ---
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -198,9 +205,9 @@ export default function AdminDashboard() {
 
           return {
             product: {
-              title: row.Title || row.title || 'Unnamed', 
+              title: row.Title || row.title || 'Unnamed',
               price: parseFloat(row.Price || row.price) || 0,
-              category: rawCategory, 
+              category: rawCategory,
               league: row.League || row.league || '',
               image_url: row.ImageUrl || row.image_url || 'https://images.unsplash.com/photo-1583318433420-532155e9d9e4',
               image_urls: row.ImageUrl || row.image_url ? [row.ImageUrl || row.image_url] : [],
@@ -211,13 +218,11 @@ export default function AdminDashboard() {
           };
         });
 
-        // 1. إدخال كل المنتجات دفعة واحدة واسترجاع بياناتها
         const formattedProducts = parsedProducts.map(p => p.product);
         const { data: insertedProducts, error } = await supabase.from('products').insert(formattedProducts).select();
-        
+
         if (error) throw error;
 
-        // 2. تجهيز المقاسات لكل منتج تم إدخاله برصيد In Stock تلقائياً
         let allVariantsToInsert: any[] = [];
         if (insertedProducts && insertedProducts.length > 0) {
           insertedProducts.forEach((prod, idx) => {
@@ -232,21 +237,20 @@ export default function AdminDashboard() {
               allVariantsToInsert.push({
                 product_id: prod.id,
                 size: s,
-                stock_quantity: defaultStock, // الرصيد المبدئي In Stock تلقائياً
+                stock_quantity: defaultStock,
                 low_stock_threshold: 2
               });
             });
           });
 
-          // 3. إدخال جميع المقاسات دفعة واحدة في جدول المخزون
           if (allVariantsToInsert.length > 0) {
             await supabase.from('product_variants').insert(allVariantsToInsert);
           }
         }
 
-        alert(`✅ Successfully added ${formattedProducts.length} products with In Stock status generated in Inventory!`); 
+        alert(`✅ Successfully added ${formattedProducts.length} products with In Stock status generated in Inventory!`);
         fetchData();
-      } catch (error: any) { alert("❌ Error: " + error.message); } 
+      } catch (error: any) { alert("❌ Error: " + error.message); }
       finally { setIsUploading(false); if (fileInputRef.current) fileInputRef.current.value = ''; }
     };
     reader.readAsArrayBuffer(file);
@@ -273,11 +277,10 @@ export default function AdminDashboard() {
     await supabase.from('products').update({ in_stock: !currentStatus }).eq('id', id); fetchData();
   };
 
-  // --- دوال المخزون اليدوي (Inventory Management) ---
   const handleAddManualStock = async (variantId: string, currentStock: number) => {
     const qtyToAdd = Number(stockAdjustment[variantId]);
     if (!qtyToAdd || qtyToAdd <= 0) return;
-    
+
     const newStock = currentStock + qtyToAdd;
     await supabase.from('product_variants').update({ stock_quantity: newStock }).eq('id', variantId);
     await supabase.from('stock_movements').insert([{ variant_id: variantId, quantity_change: qtyToAdd, quantity_after: newStock, reason: 'Manual Stock Addition' }]);
@@ -287,9 +290,7 @@ export default function AdminDashboard() {
     fetchData();
   };
 
-  // --- دوال الطلبات المحدثة (الولاء + استرجاع المخزون الذكي) ---
   const updateOrderStatus = async (orderId: string, newStatus: string, currentStatus: string) => {
-    // 1. الاسترجاع التلقائي للمخزون إذا تم الإلغاء
     if ((newStatus === 'Cancelled' || newStatus === 'Returned') && currentStatus !== 'Cancelled' && currentStatus !== 'Returned') {
       const { data: orderItems } = await supabase.from('order_items').select('*').eq('order_id', orderId);
       if (orderItems && orderItems.length > 0) {
@@ -304,7 +305,6 @@ export default function AdminDashboard() {
       }
     }
 
-    // 2. منح نقاط الولاء عند التوصيل
     if (newStatus === 'Delivered') {
       const { data: order } = await supabase.from('orders').select('*').eq('id', orderId).single();
       if (order && order.user_id && !order.points_awarded) {
@@ -317,15 +317,14 @@ export default function AdminDashboard() {
       }
     }
 
-    await supabase.from('orders').update({ order_status: newStatus, status: newStatus }).eq('id', orderId); 
+    await supabase.from('orders').update({ order_status: newStatus, status: newStatus }).eq('id', orderId);
     fetchData();
   };
 
-  // --- إنشاء طلب واتساب (يستخدم RPC الآمن لخصم المخزون) ---
   const handleCreateWhatsappOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!waOrder.variant_id) return alert('⚠️ Please select a product/size.');
-    
+
     const selectedVar = variants.find(v => v.id.toString() === waOrder.variant_id);
     const unitPrice = selectedVar?.products?.price || 0;
     const totalAmount = unitPrice * waOrder.qty;
@@ -352,7 +351,6 @@ export default function AdminDashboard() {
     await supabase.from('store_settings').upsert([{ id: 1, loyalty_point_value_usd: pointValueUsd }]); alert("✅ تم الحفظ!");
   };
 
-  // --- دوال البرومو كود ---
   const toggleCategoryForPromo = (category: string) => {
     const isSelected = newPromo.target_categories.includes(category);
     if (isSelected) setNewPromo({ ...newPromo, target_categories: newPromo.target_categories.filter(c => c !== category) });
@@ -377,14 +375,13 @@ export default function AdminDashboard() {
     switch (type) {
       case 'percentage': return <span className="text-blue-400 bg-blue-900/30 px-2 py-1 rounded text-xs border border-blue-500/30">{value}% OFF</span>;
       case 'fixed': return <span className="text-green-400 bg-green-900/30 px-2 py-1 rounded text-xs border border-green-500/30">${value} OFF</span>;
-      case 'b1g1_free': return <span className="text-emerald-400 bg-emerald-900/30 px-2 py-1 rounded text-xs border border-emerald-500/30">Buy 1 Get 1 FREE</span>;
+      case 'b1g1_free': return <span className="text-pink-400 bg-pink-900/30 px-2 py-1 rounded text-xs border border-pink-500/30">Buy 1 Get 1 FREE</span>;
       case 'bogo_50': return <span className="text-amber-400 bg-amber-900/30 px-2 py-1 rounded text-xs border border-amber-500/30">Buy 1 Get 1 50%</span>;
       case 'b2g1_free': return <span className="text-purple-400 bg-purple-900/30 px-2 py-1 rounded text-xs border border-purple-500/30">Buy 2 Get 1 FREE</span>;
       default: return <span className="text-gray-400">Discount</span>;
     }
   };
 
-  // --- دوال نافذة البوب أب التفاعلية ---
   const handleAddPopupPromo = () => {
     setPopupSettings({
       ...popupSettings,
@@ -410,10 +407,76 @@ export default function AdminDashboard() {
     else alert("🚨 Error saving popup: " + error.message);
   };
 
+  // -----------------------------------------------------------------------------------
+  // 🔥 دوال التسعير المجمّع التي كانت مفقودة (Bulk Price Editor Logic)
+  // -----------------------------------------------------------------------------------
+  const handlePreviewBulkPrice = () => {
+    if (!bulkCategory) return alert("⚠️ Please select a product category first.");
+    const val = Number(bulkAdjValue);
+    if ((!bulkAdjValue || isNaN(val)) && bulkAdjType !== 'fixed_amount') return alert("⚠️ Please enter a valid numerical value.");
+
+    const affectedProducts = products.filter(p => p.category === bulkCategory);
+    if (affectedProducts.length === 0) return alert(`⚠️ No products found in the "${bulkCategory}" category.`);
+
+    const preview = affectedProducts.map(p => {
+      let newPrice = Number(p.price);
+      switch (bulkAdjType) {
+        case 'fixed_price':
+          newPrice = val;
+          break;
+        case 'increase_percent':
+          newPrice = newPrice * (1 + (val / 100));
+          break;
+        case 'decrease_percent':
+          newPrice = newPrice * (1 - (val / 100));
+          break;
+        case 'fixed_amount':
+          newPrice = newPrice + val;
+          break;
+      }
+
+      newPrice = Math.max(0, newPrice); // منع الأسعار بالسالب
+
+      return {
+        id: p.id,
+        title: p.title,
+        category: p.category,
+        currentPrice: Number(p.price),
+        newPrice: Number(newPrice.toFixed(2))
+      };
+    });
+
+    setPreviewProducts(preview);
+    setPreviewMode(true);
+  };
+
+  const handleApplyBulkPrice = async () => {
+    if (previewProducts.length === 0) return;
+    setIsApplyingBulk(true);
+
+    try {
+      await Promise.all(
+        previewProducts.map(p =>
+          supabase.from('products').update({ price: p.newPrice }).eq('id', p.id)
+        )
+      );
+
+      alert(`✅ Successfully updated prices for ${previewProducts.length} products!`);
+      setPreviewMode(false);
+      setPreviewProducts([]);
+      setBulkAdjValue('');
+      fetchData();
+    } catch (error: any) {
+      alert("🚨 Error updating prices: " + error.message);
+    }
+
+    setIsApplyingBulk(false);
+  };
+
   return (
     <div className="bg-[#0a0a0a] min-h-screen py-10 text-white">
       <div className="container mx-auto px-6 max-w-7xl">
-        
+
         {/* الترويسة والتبويبات المجمعة */}
         <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center mb-10 border-b border-[#1f1f1f] pb-6 gap-4">
           <div>
@@ -424,6 +487,10 @@ export default function AdminDashboard() {
             <button onClick={() => setActiveTab('overview')} className={`px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition ${activeTab === 'overview' ? 'bg-[#00AEEF] text-white' : 'text-gray-400 hover:text-white'}`}><BarChart className="w-4 h-4" /> Overview</button>
             <button onClick={() => setActiveTab('inventory')} className={`px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition ${activeTab === 'inventory' ? 'bg-[#00AEEF] text-white' : 'text-gray-400 hover:text-white'}`}><Layers className="w-4 h-4" /> Inventory</button>
             <button onClick={() => setActiveTab('products')} className={`px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition ${activeTab === 'products' ? 'bg-[#00AEEF] text-white' : 'text-gray-400 hover:text-white'}`}><Package className="w-4 h-4" /> Products</button>
+
+            {/* التبويب الخاص بميزة الأسعار المجمعة Bulk Pricing */}
+            <button onClick={() => setActiveTab('bulk_price')} className={`px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition ${activeTab === 'bulk_price' ? 'bg-green-600 text-white' : 'text-gray-400 hover:text-green-400 border border-transparent hover:border-green-600/30'}`}><DollarSign className="w-4 h-4" /> Bulk Pricing</button>
+
             <button onClick={() => setActiveTab('orders')} className={`px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition ${activeTab === 'orders' ? 'bg-[#00AEEF] text-white' : 'text-gray-400 hover:text-white'}`}><ShoppingBag className="w-4 h-4" /> Orders</button>
             <button onClick={() => setActiveTab('promos')} className={`px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition ${activeTab === 'promos' ? 'bg-[#00AEEF] text-white' : 'text-gray-400 hover:text-white'}`}><Tag className="w-4 h-4" /> Promos</button>
             <button onClick={() => setActiveTab('popup')} className={`px-3 py-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition ${activeTab === 'popup' ? 'bg-[#00AEEF] text-white' : 'text-gray-400 hover:text-white'}`}><Megaphone className="w-4 h-4" /> Popup</button>
@@ -431,9 +498,9 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {loading ? ( <div className="text-center py-20 text-gray-400">Loading ERP Data...</div> ) : (
+        {loading ? (<div className="text-center py-20 text-gray-400">Loading ERP Data...</div>) : (
           <>
-            {/* 1. تبويب Overview (ERP) */}
+            {/* 1. تبويب Overview */}
             {activeTab === 'overview' && (
               <div className="space-y-8 animate-fadeIn">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -446,11 +513,11 @@ export default function AdminDashboard() {
                     <h2 className="text-3xl font-black text-white">{orders.length}</h2>
                   </div>
                   <div className="bg-[#121212] border border-[#222] p-6 rounded-2xl border-b-4 border-b-[#00AEEF]">
-                    <p className="text-[#00AEEF] text-xs font-bold uppercase tracking-wider mb-2 flex items-center gap-2"><Box className="w-4 h-4"/> Website Orders</p>
+                    <p className="text-[#00AEEF] text-xs font-bold uppercase tracking-wider mb-2 flex items-center gap-2"><Box className="w-4 h-4" /> Website Orders</p>
                     <h2 className="text-3xl font-black text-white">{websiteOrdersCount}</h2>
                   </div>
                   <div className="bg-[#121212] border border-[#222] p-6 rounded-2xl border-b-4 border-b-[#25D366]">
-                    <p className="text-[#25D366] text-xs font-bold uppercase tracking-wider mb-2 flex items-center gap-2"><Smartphone className="w-4 h-4"/> WhatsApp Orders</p>
+                    <p className="text-[#25D366] text-xs font-bold uppercase tracking-wider mb-2 flex items-center gap-2"><Smartphone className="w-4 h-4" /> WhatsApp Orders</p>
                     <h2 className="text-3xl font-black text-white">{whatsappOrdersCount}</h2>
                   </div>
                 </div>
@@ -461,7 +528,7 @@ export default function AdminDashboard() {
             {activeTab === 'inventory' && (
               <div className="bg-[#121212] rounded-2xl border border-[#1f1f1f] overflow-hidden animate-fadeIn">
                 <div className="p-6 border-b border-[#222] flex justify-between items-center bg-[#1a1a1a]">
-                  <h3 className="font-bold text-lg flex items-center gap-2"><Layers className="w-5 h-5 text-[#00AEEF]"/> Master Inventory</h3>
+                  <h3 className="font-bold text-lg flex items-center gap-2"><Layers className="w-5 h-5 text-[#00AEEF]" /> Master Inventory</h3>
                   <button onClick={fetchData} className="text-xs text-[#00AEEF] hover:underline flex items-center gap-1 font-bold"><RefreshCw className="w-3 h-3" /> Refresh Stock</button>
                 </div>
                 <div className="overflow-x-auto">
@@ -486,13 +553,13 @@ export default function AdminDashboard() {
                             <td className="px-6 py-4 font-mono font-bold text-lg">{v.stock_quantity}</td>
                             <td className="px-6 py-4">
                               {isOutOfStock ? <span className="bg-red-950 text-red-400 text-[10px] font-black uppercase px-2 py-1 rounded border border-red-500/30">Out of Stock</span> :
-                               isLowStock ? <span className="bg-amber-950 text-amber-400 text-[10px] font-black uppercase px-2 py-1 rounded border border-amber-500/30">Low Stock</span> :
-                               <span className="bg-green-950 text-green-400 text-[10px] font-black uppercase px-2 py-1 rounded border border-green-500/30">In Stock</span>}
+                                isLowStock ? <span className="bg-amber-950 text-amber-400 text-[10px] font-black uppercase px-2 py-1 rounded border border-amber-500/30">Low Stock</span> :
+                                  <span className="bg-green-950 text-green-400 text-[10px] font-black uppercase px-2 py-1 rounded border border-green-500/30">In Stock</span>}
                             </td>
                             <td className="px-6 py-4 text-right">
                               <div className="flex justify-end items-center gap-2">
-                                <input type="number" min="1" placeholder="+ Qty" value={stockAdjustment[v.id] || ''} onChange={(e) => setStockAdjustment({...stockAdjustment, [v.id]: Number(e.target.value)})} className="w-16 bg-[#0a0a0a] border border-[#333] rounded-lg p-2 text-center text-xs text-white focus:border-[#00AEEF]" />
-                                <button onClick={() => handleAddManualStock(v.id, v.stock_quantity)} className="bg-[#00AEEF] hover:bg-blue-500 text-white p-2 rounded-lg text-xs font-bold transition"><Plus className="w-4 h-4"/></button>
+                                <input type="number" min="1" placeholder="+ Qty" value={stockAdjustment[v.id] || ''} onChange={(e) => setStockAdjustment({ ...stockAdjustment, [v.id]: Number(e.target.value) })} className="w-16 bg-[#0a0a0a] border border-[#333] rounded-lg p-2 text-center text-xs text-white focus:border-[#00AEEF]" />
+                                <button onClick={() => handleAddManualStock(v.id, v.stock_quantity)} className="bg-[#00AEEF] hover:bg-blue-500 text-white p-2 rounded-lg text-xs font-bold transition"><Plus className="w-4 h-4" /></button>
                               </div>
                             </td>
                           </tr>
@@ -530,7 +597,7 @@ export default function AdminDashboard() {
 
                   <div className="bg-[#121212] p-6 rounded-2xl border border-[#1f1f1f] flex flex-col justify-center items-center text-center">
                     <h2 className="text-xl font-bold mb-2 flex items-center gap-2"><Upload className="w-5 h-5 text-[#00AEEF]" /> Bulk Upload via Excel</h2>
-                    <p className="text-gray-400 text-xs mb-6 max-w-sm leading-relaxed">Upload an Excel (.xlsx) or CSV file. Columns can include:<br/> <strong className="text-white">Title, Price, Category, League, ImageUrl, Points, InStock, Stock</strong> (Default stock is 10, In Stock automatically)</p>
+                    <p className="text-gray-400 text-xs mb-6 max-w-sm leading-relaxed">Upload an Excel (.xlsx) or CSV file. Columns can include:<br /> <strong className="text-white">Title, Price, Category, League, ImageUrl, Points, InStock, Stock</strong> (Default stock is 10, In Stock automatically)</p>
                     <input type="file" accept=".xlsx, .xls, .csv" ref={fileInputRef} onChange={handleFileUpload} className="hidden" />
                     <button onClick={() => fileInputRef.current?.click()} disabled={isUploading} className={`w-full py-5 border-2 border-dashed rounded-2xl font-bold transition flex items-center justify-center gap-3 ${isUploading ? 'border-gray-600 text-gray-500' : 'border-[#00AEEF] text-[#00AEEF] hover:bg-[#00AEEF]/10'}`}>
                       {isUploading ? <>Processing File...</> : <><Upload className="w-5 h-5" /> Select Excel File</>}
@@ -545,9 +612,9 @@ export default function AdminDashboard() {
                       <p className="text-xs text-gray-400">Filter and manage products across categories</p>
                     </div>
                     <div className="flex items-center gap-3">
-                      <select 
-                        value={adminCategoryFilter} 
-                        onChange={(e) => setAdminCategoryFilter(e.target.value)} 
+                      <select
+                        value={adminCategoryFilter}
+                        onChange={(e) => setAdminCategoryFilter(e.target.value)}
                         className="bg-[#1a1a1a] border border-[#333] rounded-lg px-3 py-1.5 text-xs text-white focus:border-[#00AEEF]"
                       >
                         <option value="All">All Categories ({products.length})</option>
@@ -561,7 +628,7 @@ export default function AdminDashboard() {
                   <div className="divide-y divide-[#1f1f1f] max-h-[600px] overflow-y-auto">
                     {products.filter(p => adminCategoryFilter === 'All' ? true : p.category === adminCategoryFilter).map((p) => {
                       const img = Array.isArray(p.image_urls) && p.image_urls.length > 0 ? p.image_urls[0] : p.imageUrl || p.image_url;
-                      const isAvailable = p.in_stock !== false; 
+                      const isAvailable = p.in_stock !== false;
                       return (
                         <div key={p.id} className={`p-4 flex items-center justify-between gap-4 transition ${!isAvailable ? 'bg-[#1a0505] opacity-70' : 'hover:bg-[#161616]'}`}>
                           <div className="flex items-center gap-4">
@@ -594,82 +661,164 @@ export default function AdminDashboard() {
               </div>
             )}
 
-            {/* 4. تبويب الطلبات */}
-            {activeTab === 'orders' && (
-               <div className="space-y-6 animate-fadeIn">
-                 <button onClick={() => setIsWhatsAppModalOpen(true)} className="bg-[#25D366] hover:bg-[#20b858] text-white font-extrabold px-6 py-4 rounded-xl shadow-lg flex items-center gap-2 transition">
-                   <Smartphone className="w-5 h-5" /> + New WhatsApp Order
-                 </button>
+            {/* 🆕 4. التبويب الخاص بميزة Bulk Pricing (تعديل الأسعار المجمّع) 🆕 */}
+            {activeTab === 'bulk_price' && (
+              <div className="space-y-8 animate-fadeIn">
+                <div className="bg-[#121212] p-6 md:p-8 rounded-2xl border border-[#1f1f1f] shadow-xl">
+                  <h3 className="font-bold text-xl border-b border-[#222] pb-4 flex items-center gap-2 mb-6">
+                    <DollarSign className="w-6 h-6 text-green-500" /> Bulk Price Editor
+                  </h3>
 
-                 <div className="bg-[#121212] rounded-2xl border border-[#1f1f1f] overflow-hidden">
+                  {!previewMode ? (
+                    <div className="space-y-6">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div>
+                          <label className="block text-sm font-bold text-gray-300 mb-2">1. Select Category</label>
+                          <select value={bulkCategory} onChange={(e) => setBulkCategory(e.target.value)} className="w-full bg-[#1a1a1a] border border-[#333] rounded-xl p-3.5 text-white focus:border-[#00AEEF]">
+                            <option value="">-- Choose Category --</option>
+                            {dynamicCategories.map(cat => <option key={cat as string} value={cat as string}>{cat as string}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-bold text-gray-300 mb-2">2. Adjustment Type</label>
+                          <select value={bulkAdjType} onChange={(e) => setBulkAdjType(e.target.value)} className="w-full bg-[#1a1a1a] border border-[#333] rounded-xl p-3.5 text-white focus:border-[#00AEEF]">
+                            <option value="fixed_price">Set Fixed Price (\$)</option>
+                            <option value="increase_percent">Increase by Percentage (+%)</option>
+                            <option value="decrease_percent">Decrease by Percentage (-%)</option>
+                            <option value="fixed_amount">Increase/Decrease Amount (+/- $)</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-bold text-gray-300 mb-2">3. Value</label>
+                          <input type="number" step="0.01" value={bulkAdjValue} onChange={(e) => setBulkAdjValue(e.target.value === '' ? '' : Number(e.target.value))} placeholder="e.g. 15 or 49.99" className="w-full bg-[#1a1a1a] border border-[#333] rounded-xl p-3.5 text-white focus:border-[#00AEEF]" />
+                          {bulkAdjType === 'fixed_amount' && <p className="text-[10px] text-gray-500 mt-1">Use a negative number (e.g. -5) to reduce price.</p>}
+                        </div>
+                      </div>
+                      <button onClick={handlePreviewBulkPrice} className="w-full bg-green-600 hover:bg-green-500 text-white font-extrabold py-4 rounded-xl transition shadow-lg text-lg flex justify-center items-center gap-2">
+                        <Eye className="w-5 h-5" /> Preview Price Changes
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-6 animate-fadeIn">
+                      <div className="bg-amber-900/20 border border-amber-500/30 p-5 rounded-xl flex items-center justify-between">
+                        <div>
+                          <h4 className="text-amber-400 font-bold text-lg mb-1">Previewing Changes</h4>
+                          <p className="text-sm text-gray-300">You are about to update the prices of <strong className="text-white text-base">{previewProducts.length}</strong> products in the <strong className="text-white text-base">{bulkCategory}</strong> category.</p>
+                        </div>
+                      </div>
+
+                      <div className="max-h-[400px] overflow-y-auto border border-[#333] rounded-xl">
+                        <table className="w-full text-left text-sm">
+                          <thead className="bg-[#1a1a1a] text-xs uppercase text-gray-500 font-extrabold border-b border-[#333] sticky top-0">
+                            <tr>
+                              <th className="px-6 py-4">Product Name</th>
+                              <th className="px-6 py-4">Current Price</th>
+                              <th className="px-6 py-4 text-green-400">New Price</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-[#1f1f1f]">
+                            {previewProducts.map(p => (
+                              <tr key={p.id} className="hover:bg-[#161616]">
+                                <td className="px-6 py-3 font-bold text-white max-w-[250px] truncate" title={p.title}>{p.title}</td>
+                                <td className="px-6 py-3 text-gray-400 line-through">${p.currentPrice.toFixed(2)}</td>
+                                <td className="px-6 py-3 text-green-400 font-black">${p.newPrice.toFixed(2)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      <div className="flex flex-col sm:flex-row gap-4 pt-4 border-t border-[#222]">
+                        <button onClick={() => setPreviewMode(false)} disabled={isApplyingBulk} className="flex-1 bg-[#1a1a1a] text-gray-300 hover:text-white py-4 rounded-xl border border-[#333] font-bold transition">
+                          Cancel & Go Back
+                        </button>
+                        <button onClick={handleApplyBulkPrice} disabled={isApplyingBulk} className="flex-1 bg-green-600 hover:bg-green-500 text-white py-4 rounded-xl font-extrabold flex justify-center items-center gap-2 transition shadow-lg">
+                          {isApplyingBulk ? <><RefreshCw className="w-5 h-5 animate-spin" /> Updating Database...</> : `Confirm & Apply to ${previewProducts.length} Products`}
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* 5. تبويب الطلبات */}
+            {activeTab === 'orders' && (
+              <div className="space-y-6 animate-fadeIn">
+                <button onClick={() => setIsWhatsAppModalOpen(true)} className="bg-[#25D366] hover:bg-[#20b858] text-white font-extrabold px-6 py-4 rounded-xl shadow-lg flex items-center gap-2 transition">
+                  <Smartphone className="w-5 h-5" /> + New WhatsApp Order
+                </button>
+
+                <div className="bg-[#121212] rounded-2xl border border-[#1f1f1f] overflow-hidden">
                   <div className="p-6 border-b border-[#222] flex justify-between items-center">
                     <h3 className="font-bold text-lg">Central Orders Tracker ({orders.length})</h3>
                     <button onClick={fetchData} className="text-xs text-[#00AEEF] hover:underline flex items-center gap-1 font-bold"><RefreshCw className="w-3 h-3" /> Refresh Orders</button>
                   </div>
                   <div className="divide-y divide-[#1f1f1f]">
                     {orders.length === 0 ? <div className="p-12 text-center text-gray-400">No orders placed yet.</div> : orders.map((order) => {
-                        const status = order.order_status || order.status || 'Pending';
-                        const isWebsite = order.source !== 'WhatsApp';
-                        return (
-                          <div key={order.id} className="p-6 space-y-4 hover:bg-[#161616] transition">
-                            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2">
-                              <div>
-                                <div className="flex items-center gap-2 mb-1">
-                                  <p className="font-mono text-xs text-gray-400">ORDER #{order.id.slice(0,8).toUpperCase()}</p>
-                                  <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded border ${isWebsite ? 'bg-[#00AEEF]/20 text-[#00AEEF] border-[#00AEEF]/30' : 'bg-[#25D366]/20 text-[#25D366] border-[#25D366]/30'}`}>
-                                    {isWebsite ? '🌐 Website' : '💬 WhatsApp'}
-                                  </span>
-                                </div>
-                                <h4 className="font-extrabold text-white text-base mt-1">{order.first_name} {order.last_name} ({order.phone})</h4>
-                                <p className="text-xs text-gray-400 mt-1">{order.address}</p>
-                                {order.promo_code && <div className="mt-2 inline-flex items-center gap-1.5 text-xs font-bold bg-purple-500/10 text-purple-400 border border-purple-500/30 px-3 py-1.5 rounded-lg"><Tag className="w-3.5 h-3.5" /> Promo Used: {order.promo_code}</div>}
-                                {order.notes && <p className="text-xs text-amber-400 mt-2 bg-amber-500/10 p-2 rounded border border-amber-500/30">📝 Notes: {order.notes}</p>}
+                      const status = order.order_status || order.status || 'Pending';
+                      const isWebsite = order.source !== 'WhatsApp';
+                      return (
+                        <div key={order.id} className="p-6 space-y-4 hover:bg-[#161616] transition">
+                          <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2">
+                            <div>
+                              <div className="flex items-center gap-2 mb-1">
+                                <p className="font-mono text-xs text-gray-400">ORDER #{order.id.slice(0, 8).toUpperCase()}</p>
+                                <span className={`text-[9px] font-black uppercase tracking-wider px-2 py-0.5 rounded border ${isWebsite ? 'bg-[#00AEEF]/20 text-[#00AEEF] border-[#00AEEF]/30' : 'bg-[#25D366]/20 text-[#25D366] border-[#25D366]/30'}`}>
+                                  {isWebsite ? '🌐 Website' : '💬 WhatsApp'}
+                                </span>
                               </div>
-                              <div className="flex items-center gap-3">
-                                <select 
-                                  value={status} 
-                                  onChange={(e) => updateOrderStatus(order.id, e.target.value, status)}
-                                  className={`text-xs font-bold rounded-lg p-2 border focus:outline-none 
-                                    ${status === 'Delivered' ? 'bg-green-950 text-green-400 border-green-500/30' : 
-                                      status === 'Cancelled' || status === 'Returned' ? 'bg-red-950 text-red-400 border-red-500/30' : 
-                                      'bg-yellow-950 text-yellow-400 border-yellow-500/30'}`}
-                                >
-                                  <option value="Pending">Pending</option>
-                                  <option value="Confirmed">Confirmed</option>
-                                  <option value="Processing">Processing</option>
-                                  <option value="Shipped">Shipped</option>
-                                  <option value="Delivered">Delivered</option>
-                                  <option value="Returned">Returned (Restocks)</option>
-                                  <option value="Cancelled">Cancelled (Restocks)</option>
-                                </select>
-                              </div>
+                              <h4 className="font-extrabold text-white text-base mt-1">{order.first_name} {order.last_name} ({order.phone})</h4>
+                              <p className="text-xs text-gray-400 mt-1">{order.address}</p>
+                              {order.promo_code && <div className="mt-2 inline-flex items-center gap-1.5 text-xs font-bold bg-purple-500/10 text-purple-400 border border-purple-500/30 px-3 py-1.5 rounded-lg"><Tag className="w-3.5 h-3.5" /> Promo Used: {order.promo_code}</div>}
+                              {order.notes && <p className="text-xs text-amber-400 mt-2 bg-amber-500/10 p-2 rounded border border-amber-500/30">📝 Notes: {order.notes}</p>}
                             </div>
-                            <div className="bg-[#1a1a1a] p-3 rounded-xl border border-[#262626] space-y-1">
-                              {order.order_items && order.order_items.length > 0 ? (
-                                order.order_items.map((item: any, idx: number) => {
-                                  const v = variants.find(vr => vr.id === item.variant_id);
-                                  return (
-                                  <div key={idx} className="flex justify-between text-xs text-gray-300">
-                                    <span>{item.quantity}x {v?.products?.title || 'Item'} (Size: {v?.size || '?'})</span>
-                                    <span className="font-bold text-white">${item.unit_price}</span>
-                                  </div>
-                                )})
-                              ) : (
-                                Array.isArray(order.items) && order.items.map((item: any, idx: number) => (
-                                  <div key={idx} className="flex justify-between text-xs text-gray-300"><span>{item.quantity}x {item.title}</span><span className="font-bold text-white">${item.price}</span></div>
-                                ))
-                              )}
-                              <div className="border-t border-[#2d2d2d] pt-2 mt-2 flex justify-between items-center text-sm font-extrabold text-white"><span>Total (COD):</span><span className="text-[#00AEEF]">${order.total_amount}</span></div>
+                            <div className="flex items-center gap-3">
+                              <select
+                                value={status}
+                                onChange={(e) => updateOrderStatus(order.id, e.target.value, status)}
+                                className={`text-xs font-bold rounded-lg p-2 border focus:outline-none 
+                                    ${status === 'Delivered' ? 'bg-green-950 text-green-400 border-green-500/30' :
+                                    status === 'Cancelled' || status === 'Returned' ? 'bg-red-950 text-red-400 border-red-500/30' :
+                                      'bg-yellow-950 text-yellow-400 border-yellow-500/30'}`}
+                              >
+                                <option value="Pending">Pending</option>
+                                <option value="Confirmed">Confirmed</option>
+                                <option value="Processing">Processing</option>
+                                <option value="Shipped">Shipped</option>
+                                <option value="Delivered">Delivered</option>
+                                <option value="Returned">Returned (Restocks)</option>
+                                <option value="Cancelled">Cancelled (Restocks)</option>
+                              </select>
                             </div>
                           </div>
-                        );
+                          <div className="bg-[#1a1a1a] p-3 rounded-xl border border-[#262626] space-y-1">
+                            {order.order_items && order.order_items.length > 0 ? (
+                              order.order_items.map((item: any, idx: number) => {
+                                const v = variants.find(vr => vr.id === item.variant_id);
+                                return (
+                                  <div key={idx} className="flex justify-between text-xs text-gray-300">
+                                    <span>{item.quantity}x {v?.products?.title || 'Item'} (Size: {v?.size || '?'})</span>
+                                    <span className="font-bold text-white">\${item.unit_price}</span>
+                                  </div>
+                                )
+                              })
+                            ) : (
+                              Array.isArray(order.items) && order.items.map((item: any, idx: number) => (
+                                <div key={idx} className="flex justify-between text-xs text-gray-300"><span>{item.quantity}x {item.title}</span><span className="font-bold text-white">\${item.price}</span></div>
+                              ))
+                            )}
+                            <div className="border-t border-[#2d2d2d] pt-2 mt-2 flex justify-between items-center text-sm font-extrabold text-white"><span>Total (COD):</span><span className="text-[#00AEEF]">\${order.total_amount}</span></div>
+                          </div>
+                        </div>
+                      );
                     })}
                   </div>
-                 </div>
-               </div>
+                </div>
+              </div>
             )}
 
-            {/* 5. تبويب الأكواد الذكية (Promos) */}
+            {/* 6. تبويب الأكواد الذكية (Promos) */}
             {activeTab === 'promos' && (
               <div className="space-y-8 animate-fadeIn">
                 <form onSubmit={handleAddPromoCode} className="bg-[#121212] p-8 rounded-2xl border border-[#1f1f1f] shadow-xl max-w-4xl space-y-6">
@@ -683,7 +832,7 @@ export default function AdminDashboard() {
                       <label className="block text-sm font-bold text-gray-300 mb-2">Offer Type</label>
                       <select value={newPromo.discount_type} onChange={(e) => setNewPromo({ ...newPromo, discount_type: e.target.value })} className="w-full bg-[#1a1a1a] border border-[#333] rounded-xl p-3.5 text-white focus:border-[#00AEEF]">
                         <option value="percentage">Discount Percentage (%)</option>
-                        <option value="fixed">Fixed Amount ($)</option>
+                        <option value="fixed">Fixed Amount (\$)</option>
                         <option value="b1g1_free">Buy 1 Get 1 FREE</option>
                         <option value="bogo_50">Buy 1 Get 1 50% OFF</option>
                         <option value="b2g1_free">Buy 2 Get 1 FREE</option>
@@ -714,27 +863,27 @@ export default function AdminDashboard() {
                   <div className="p-6 border-b border-[#222] flex justify-between items-center"><h3 className="font-bold text-lg">Active Campaigns ({promos.length})</h3></div>
                   <div className="divide-y divide-[#1f1f1f]">
                     {promos.length === 0 ? <div className="p-12 text-center text-gray-500">No campaigns.</div> : promos.map((promo) => (
-                        <div key={promo.id} className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-[#161616] transition">
-                          <div>
-                            <div className="flex items-center gap-3 mb-2"><span className="font-mono text-xl font-black text-[#00AEEF] tracking-widest">{promo.code}</span>{getPromoTypeBadge(promo.discount_type, promo.discount_value)}</div>
-                            <p className="text-sm text-gray-400">{promo.description}</p>
-                            <div className="mt-3 flex flex-wrap gap-1.5">
-                              {promo.target_categories && promo.target_categories.length > 0 ? promo.target_categories.map((c: string) => <span key={c} className="text-[10px] bg-[#1a1a1a] border border-[#333] px-2 py-1 rounded text-gray-400">{c}</span>) : <span className="text-[10px] bg-green-900/20 border border-green-500/30 px-2 py-1 rounded text-green-400">All Categories</span>}
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            <span className={`text-[10px] font-extrabold uppercase px-3 py-1.5 rounded-full border ${promo.is_active ? 'bg-green-950/40 text-green-400 border-green-500/30' : 'bg-red-950/40 text-red-400 border-red-500/30'}`}>{promo.is_active ? 'Active' : 'Disabled'}</span>
-                            <button onClick={() => togglePromoStatus(promo.id, promo.is_active)} className={`p-2.5 rounded-xl transition ${promo.is_active ? 'bg-[#1a1a1a] hover:bg-yellow-600 text-gray-300 border border-[#333]' : 'bg-[#1a1a1a] hover:bg-green-600 text-gray-300 border border-[#333]'}`}>{promo.is_active ? <PowerOff className="w-5 h-5" /> : <Power className="w-5 h-5" />}</button>
-                            <button onClick={() => handleDeletePromo(promo.id)} className="p-2.5 bg-[#1a1a1a] border border-[#333] hover:bg-red-600 rounded-xl"><Trash2 className="w-5 h-5" /></button>
+                      <div key={promo.id} className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-4 hover:bg-[#161616] transition">
+                        <div>
+                          <div className="flex items-center gap-3 mb-2"><span className="font-mono text-xl font-black text-[#00AEEF] tracking-widest">{promo.code}</span>{getPromoTypeBadge(promo.discount_type, promo.discount_value)}</div>
+                          <p className="text-sm text-gray-400">{promo.description}</p>
+                          <div className="mt-3 flex flex-wrap gap-1.5">
+                            {promo.target_categories && promo.target_categories.length > 0 ? promo.target_categories.map((c: string) => <span key={c} className="text-[10px] bg-[#1a1a1a] border border-[#333] px-2 py-1 rounded text-gray-400">{c}</span>) : <span className="text-[10px] bg-green-900/20 border border-green-500/30 px-2 py-1 rounded text-green-400">All Categories</span>}
                           </div>
                         </div>
-                      ))}
+                        <div className="flex items-center gap-3">
+                          <span className={`text-[10px] font-extrabold uppercase px-3 py-1.5 rounded-full border ${promo.is_active ? 'bg-green-950/40 text-green-400 border-green-500/30' : 'bg-red-950/40 text-red-400 border-red-500/30'}`}>{promo.is_active ? 'Active' : 'Disabled'}</span>
+                          <button onClick={() => togglePromoStatus(promo.id, promo.is_active)} className={`p-2.5 rounded-xl transition ${promo.is_active ? 'bg-[#1a1a1a] hover:bg-yellow-600 text-gray-300 border border-[#333]' : 'bg-[#1a1a1a] hover:bg-green-600 text-gray-300 border border-[#333]'}`}>{promo.is_active ? <PowerOff className="w-5 h-5" /> : <Power className="w-5 h-5" />}</button>
+                          <button onClick={() => handleDeletePromo(promo.id)} className="p-2.5 bg-[#1a1a1a] border border-[#333] hover:bg-red-600 rounded-xl"><Trash2 className="w-5 h-5" /></button>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
             )}
 
-            {/* 6. تبويب الـ Popup Builder */}
+            {/* 7. تبويب الـ Popup Builder */}
             {activeTab === 'popup' && (
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-fadeIn">
                 <form onSubmit={handleSavePopupSettings} className="bg-[#121212] p-6 md:p-8 rounded-2xl border border-[#1f1f1f] shadow-xl space-y-6">
@@ -749,7 +898,7 @@ export default function AdminDashboard() {
                     <div className="space-y-4 bg-[#161616] p-5 rounded-xl border border-[#222]">
                       <div><label className="block text-xs font-bold text-gray-400 mb-1">Headline (Title)</label><input type="text" value={popupSettings.title} onChange={(e) => setPopupSettings({ ...popupSettings, title: e.target.value })} className="w-full bg-[#1a1a1a] border border-[#333] rounded-xl p-3 text-white focus:border-[#00AEEF] uppercase font-black" /></div>
                       <div><label className="block text-xs font-bold text-gray-400 mb-1">Subtext (Description)</label><input type="text" value={popupSettings.description} onChange={(e) => setPopupSettings({ ...popupSettings, description: e.target.value })} className="w-full bg-[#1a1a1a] border border-[#333] rounded-xl p-3 text-white focus:border-[#00AEEF]" /></div>
-                      
+
                       <div className="grid grid-cols-2 gap-4">
                         <div>
                           <label className="block text-xs font-bold text-gray-400 mb-1">Show Frequency</label>
@@ -769,9 +918,9 @@ export default function AdminDashboard() {
                     <div className="space-y-3 border-t border-[#222] pt-4">
                       <div className="flex items-center justify-between">
                         <h4 className="font-bold text-sm text-gray-300">Promo Code Blocks</h4>
-                        <button type="button" onClick={handleAddPopupPromo} className="text-[#00AEEF] text-xs font-bold flex items-center gap-1 hover:underline"><Plus className="w-3 h-3"/> Add Promo</button>
+                        <button type="button" onClick={handleAddPopupPromo} className="text-[#00AEEF] text-xs font-bold flex items-center gap-1 hover:underline"><Plus className="w-3 h-3" /> Add Promo</button>
                       </div>
-                      
+
                       {popupSettings.promos.map((promo, index) => (
                         <div key={index} className="bg-[#1a1a1a] p-4 rounded-xl border border-[#333] relative">
                           <button type="button" onClick={() => handleRemovePopupPromo(index)} className="absolute top-2 right-2 text-gray-500 hover:text-red-500"><X className="w-4 h-4" /></button>
@@ -796,10 +945,10 @@ export default function AdminDashboard() {
 
                 <div className="hidden lg:flex flex-col items-center justify-center p-8 bg-[#0a0a0a] border-2 border-dashed border-[#222] rounded-2xl relative">
                   <div className="absolute top-4 left-4 text-xs font-bold text-gray-500 uppercase flex items-center gap-2"><span className="w-2 h-2 rounded-full bg-red-500 animate-pulse"></span> Live Preview</div>
-                  
+
                   <div className={`relative w-full max-w-[380px] bg-[#0d0d0d] border border-[#1f1f1f] rounded-3xl overflow-hidden shadow-2xl transition-all duration-500 p-6 ${!popupSettings.is_active ? 'opacity-40 grayscale scale-95' : 'opacity-100 scale-100'}`}>
                     <button disabled className="absolute top-4 right-4 text-gray-400 hover:text-white p-1.5 bg-[#1a1a1a] rounded-full"><X className="w-4 h-4" /></button>
-                    
+
                     <div className="flex flex-col items-center mb-6">
                       <div className="w-12 h-12 rounded-full border border-[#222] flex items-center justify-center mb-4 bg-[#121212]">
                         <Sparkles className="text-[#00AEEF] w-6 h-6" />
@@ -828,7 +977,7 @@ export default function AdminDashboard() {
                     <button disabled className="w-full bg-[#005c8a] text-white font-bold py-4 rounded-xl flex items-center justify-center gap-2 text-sm shadow-md">
                       <ShoppingBag className="w-4 h-4" /> {popupSettings.button_text}
                     </button>
-                    
+
                     <p className="text-[10px] text-gray-500 text-center mt-4 px-4">{popupSettings.footer_text}</p>
                   </div>
                   {!popupSettings.is_active && <p className="text-red-400 text-xs font-bold mt-6">⚠️ Currently Disabled. Toggle the switch to activate.</p>}
@@ -836,7 +985,7 @@ export default function AdminDashboard() {
               </div>
             )}
 
-            {/* 7. تبويب الولاء */}
+            {/* 8. تبويب الولاء */}
             {activeTab === 'loyalty' && (
               <div className="bg-[#121212] p-8 rounded-2xl border border-[#1f1f1f] max-w-xl space-y-6">
                 <h3 className="font-bold text-xl border-b border-[#222] pb-4 flex items-center gap-2">
@@ -878,7 +1027,7 @@ export default function AdminDashboard() {
                   </select>
                 </div>
                 <input type="url" value={editingProduct.imageUrl || ''} onChange={(e) => setEditingProduct({ ...editingProduct, imageUrl: e.target.value })} className="w-full bg-[#1a1a1a] border border-[#333] rounded-lg p-3 text-white text-sm" />
-                
+
                 <div className="flex items-center justify-between bg-[#1a1a1a] p-3 rounded-lg border border-[#333]">
                   <span className="text-sm font-bold text-gray-300">Website Visibility</span>
                   <button type="button" onClick={() => setEditingProduct({ ...editingProduct, in_stock: !editingProduct.in_stock })} className={`relative w-12 h-6 rounded-full transition-colors duration-300 ${editingProduct.in_stock !== false ? 'bg-[#00AEEF]' : 'bg-[#444]'}`}>
@@ -898,29 +1047,29 @@ export default function AdminDashboard() {
           <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
             <div className="bg-[#121212] border border-[#25D366]/40 rounded-2xl p-6 max-w-lg w-full space-y-4 shadow-[0_0_50px_rgba(37,211,102,0.1)]">
               <div className="flex justify-between items-center border-b border-[#222] pb-3">
-                <h3 className="font-extrabold text-xl flex items-center gap-2 text-[#25D366]"><Smartphone className="w-6 h-6"/> Manual WhatsApp Order</h3>
+                <h3 className="font-extrabold text-xl flex items-center gap-2 text-[#25D366]"><Smartphone className="w-6 h-6" /> Manual WhatsApp Order</h3>
                 <button onClick={() => setIsWhatsAppModalOpen(false)} className="text-gray-400 hover:text-white"><X className="w-5 h-5" /></button>
               </div>
               <form onSubmit={handleCreateWhatsappOrder} className="space-y-4 pt-2">
                 <div className="grid grid-cols-2 gap-4">
-                  <input type="text" required placeholder="First Name" value={waOrder.first_name} onChange={e=>setWaOrder({...waOrder, first_name: e.target.value})} className="bg-[#1a1a1a] border border-[#333] rounded-lg p-3 text-white text-sm focus:border-[#25D366] outline-none"/>
-                  <input type="text" required placeholder="Last Name" value={waOrder.last_name} onChange={e=>setWaOrder({...waOrder, last_name: e.target.value})} className="bg-[#1a1a1a] border border-[#333] rounded-lg p-3 text-white text-sm focus:border-[#25D366] outline-none"/>
+                  <input type="text" required placeholder="First Name" value={waOrder.first_name} onChange={e => setWaOrder({ ...waOrder, first_name: e.target.value })} className="bg-[#1a1a1a] border border-[#333] rounded-lg p-3 text-white text-sm focus:border-[#25D366] outline-none" />
+                  <input type="text" required placeholder="Last Name" value={waOrder.last_name} onChange={e => setWaOrder({ ...waOrder, last_name: e.target.value })} className="bg-[#1a1a1a] border border-[#333] rounded-lg p-3 text-white text-sm focus:border-[#25D366] outline-none" />
                 </div>
-                <input type="tel" required placeholder="Phone Number" value={waOrder.phone} onChange={e=>setWaOrder({...waOrder, phone: e.target.value})} className="w-full bg-[#1a1a1a] border border-[#333] rounded-lg p-3 text-white text-sm focus:border-[#25D366] outline-none"/>
-                <input type="text" required placeholder="Full Address" value={waOrder.address} onChange={e=>setWaOrder({...waOrder, address: e.target.value})} className="w-full bg-[#1a1a1a] border border-[#333] rounded-lg p-3 text-white text-sm focus:border-[#25D366] outline-none"/>
-                
+                <input type="tel" required placeholder="Phone Number" value={waOrder.phone} onChange={e => setWaOrder({ ...waOrder, phone: e.target.value })} className="w-full bg-[#1a1a1a] border border-[#333] rounded-lg p-3 text-white text-sm focus:border-[#25D366] outline-none" />
+                <input type="text" required placeholder="Full Address" value={waOrder.address} onChange={e => setWaOrder({ ...waOrder, address: e.target.value })} className="w-full bg-[#1a1a1a] border border-[#333] rounded-lg p-3 text-white text-sm focus:border-[#25D366] outline-none" />
+
                 <div className="bg-[#161616] p-4 rounded-xl border border-[#222]">
                   <label className="block text-xs font-bold text-gray-400 mb-2">Select Product Variant & Size *</label>
-                  <select required value={waOrder.variant_id} onChange={e=>setWaOrder({...waOrder, variant_id: e.target.value})} className="w-full bg-[#0a0a0a] border border-[#333] rounded-lg p-3 text-white text-sm mb-3 focus:border-[#25D366] outline-none">
+                  <select required value={waOrder.variant_id} onChange={e => setWaOrder({ ...waOrder, variant_id: e.target.value })} className="w-full bg-[#0a0a0a] border border-[#333] rounded-lg p-3 text-white text-sm mb-3 focus:border-[#25D366] outline-none">
                     <option value="">-- Choose Product/Size --</option>
                     {variants.filter(v => v.stock_quantity > 0).map(v => (
-                      <option key={v.id} value={v.id}>{v.products?.title} | Size: {v.size} | Stock: {v.stock_quantity} | ${v.products?.price}</option>
+                      <option key={v.id} value={v.id}>{v.products?.title} | Size: {v.size} | Stock: {v.stock_quantity} | \${v.products?.price}</option>
                     ))}
                   </select>
                   <label className="block text-xs font-bold text-gray-400 mb-2">Quantity</label>
-                  <input type="number" min="1" required value={waOrder.qty} onChange={e=>setWaOrder({...waOrder, qty: Number(e.target.value)})} className="w-full bg-[#0a0a0a] border border-[#333] rounded-lg p-3 text-white text-sm focus:border-[#25D366] outline-none" />
+                  <input type="number" min="1" required value={waOrder.qty} onChange={e => setWaOrder({ ...waOrder, qty: Number(e.target.value) })} className="w-full bg-[#0a0a0a] border border-[#333] rounded-lg p-3 text-white text-sm focus:border-[#25D366] outline-none" />
                 </div>
-                
+
                 <button type="submit" className="w-full bg-[#25D366] hover:bg-[#20b858] text-white py-4 rounded-xl font-extrabold shadow-lg transition flex items-center justify-center gap-2">
                   Create Order & Deduct Stock
                 </button>

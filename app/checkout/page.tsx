@@ -5,13 +5,13 @@ import { useRouter } from 'next/navigation';
 import { useCartStore } from '@/store/cart';
 import { supabase } from '@/lib/supabase';
 import { trackFbEvent } from '@/lib/fbPixel';
-import { 
-  ShoppingBag, 
-  Truck, 
-  ShieldCheck, 
-  Tag, 
-  CheckCircle2, 
-  AlertCircle, 
+import {
+  ShoppingBag,
+  Truck,
+  ShieldCheck,
+  Tag,
+  CheckCircle2,
+  AlertCircle,
   ArrowLeft,
   Loader2
 } from 'lucide-react';
@@ -83,10 +83,10 @@ export default function CheckoutPage() {
       }
 
       let eligibleItems: { price: number; category: string; title: string }[] = [];
-      
+
       items.forEach((item: any) => {
         const isEligible = !promo.target_categories || promo.target_categories.length === 0 || promo.target_categories.includes(item.category);
-        
+
         if (isEligible) {
           const qty = Number(item.quantity) || 1;
           const price = parseFloat(item.price) || 0;
@@ -113,7 +113,7 @@ export default function CheckoutPage() {
         case 'fixed':
           calculatedDiscount = Math.min(eligibleSubtotal, Number(promo.discount_value));
           break;
-        case 'b1g1_free':
+        case 'b1g1_free': // --- الكود الجديد: اشتر 1 واحصل على 1 مجاناً ---
           if (eligibleItems.length < 2) {
             setVoucherError('⚠️ This offer requires at least 2 eligible items in your bag.');
             setIsApplyingVoucher(false);
@@ -121,7 +121,7 @@ export default function CheckoutPage() {
           }
           const b1g1Pairs = Math.floor(eligibleItems.length / 2);
           for (let i = 0; i < b1g1Pairs; i++) {
-            calculatedDiscount += eligibleItems[i].price;
+            calculatedDiscount += eligibleItems[i].price; // خصم 100% من سعر القطعة الأرخص
           }
           break;
         case 'bogo_50':
@@ -274,8 +274,8 @@ export default function CheckoutPage() {
         <ShoppingBag className="w-16 h-16 text-gray-600 mb-4" />
         <h2 className="text-2xl font-bold mb-2">Your Bag is Empty</h2>
         <p className="text-gray-400 mb-8 text-sm">Add some jerseys or boots before checking out.</p>
-        <Link 
-          href="/catalog" 
+        <Link
+          href="/catalog"
           className="bg-[#00AEEF] hover:bg-blue-500 text-white font-extrabold px-8 py-4 rounded-xl transition"
         >
           Explore Catalog
@@ -287,16 +287,16 @@ export default function CheckoutPage() {
   return (
     <div className="bg-[#0a0a0a] min-h-screen py-12 text-white">
       <div className="container mx-auto px-6 max-w-6xl">
-        
-        <Link 
-          href="/cart" 
+
+        <Link
+          href="/cart"
           className="inline-flex items-center gap-2 text-gray-400 hover:text-white mb-8 transition text-sm font-semibold"
         >
           <ArrowLeft className="w-4 h-4" /> Back to Cart
         </Link>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-          
+
           <div className="lg:col-span-7 space-y-6">
             <div className="bg-[#121212] p-6 md:p-8 rounded-2xl border border-[#1f1f1f]">
               <h2 className="text-xl font-extrabold uppercase tracking-tight mb-6 flex items-center gap-2">
@@ -381,7 +381,7 @@ export default function CheckoutPage() {
               </h2>
 
               <div className="space-y-4 max-h-60 overflow-y-auto pr-1 divide-y divide-[#1f1f1f]">
-              {items.map((item: any) => (
+                {items.map((item: any) => (
                   <div key={item.id} className="pt-3 first:pt-0 flex justify-between items-center text-sm">
                     <div className="flex items-center gap-3">
                       <span className="font-extrabold text-gray-400 text-xs bg-[#1a1a1a] px-2 py-1 rounded">
@@ -475,11 +475,10 @@ export default function CheckoutPage() {
                 type="submit"
                 form="checkout-form"
                 disabled={isSubmitting}
-                className={`w-full font-extrabold py-5 rounded-xl transition shadow-xl text-base flex items-center justify-center gap-2 ${
-                  isSubmitting
-                    ? 'bg-gray-700 text-gray-300 cursor-not-allowed'
-                    : 'bg-[#00AEEF] hover:bg-blue-500 text-white shadow-[0_0_20px_rgba(0,174,239,0.3)]'
-                }`}
+                className={`w-full font-extrabold py-5 rounded-xl transition shadow-xl text-base flex items-center justify-center gap-2 ${isSubmitting
+                  ? 'bg-gray-700 text-gray-300 cursor-not-allowed'
+                  : 'bg-[#00AEEF] hover:bg-blue-500 text-white shadow-[0_0_20px_rgba(0,174,239,0.3)]'
+                  }`}
               >
                 {isSubmitting ? (
                   <>
